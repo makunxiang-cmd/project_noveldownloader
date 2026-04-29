@@ -5,6 +5,11 @@ repo_url: https://github.com/makunxiang-cmd/project_noveldownloader
 repo_name: makunxiang-cmd/project_noveldownloader
 edit_uri: edit/main/docs/
 docs_dir: .
+site_dir: ../site
+exclude_docs: |
+  agents/**
+  superpowers/SESSION-STATE.md
+  superpowers/plans/**
 
 theme:
   name: material
@@ -54,3 +59,4 @@ nav:
   - User Guide: user-guide/README.md
   - Rule Authoring: rule-authoring/README.md
   - Developer: developer/README.md
+  - Design Spec: superpowers/specs/2026-04-20-ndl-design.md
