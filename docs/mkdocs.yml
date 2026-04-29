@@ -1,0 +1,56 @@
+site_name: NDL - NOVELDOWNLOADER
+site_description: Rule-driven Chinese novel downloader and format converter
+site_url: https://makunxiang-cmd.github.io/project_noveldownloader/
+repo_url: https://github.com/makunxiang-cmd/project_noveldownloader
+repo_name: makunxiang-cmd/project_noveldownloader
+edit_uri: edit/main/docs/
+docs_dir: .
+
+theme:
+  name: material
+  language: en
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - User Guide: user-guide/README.md
+  - Rule Authoring: rule-authoring/README.md
+  - Developer: developer/README.md
