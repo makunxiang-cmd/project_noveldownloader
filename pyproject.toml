@@ -99,11 +99,6 @@ warn_return_any = true
 show_error_codes = true
 files = ["src/ndl"]
 
-[[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
