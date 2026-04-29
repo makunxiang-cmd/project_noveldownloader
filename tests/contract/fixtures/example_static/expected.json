@@ -1,0 +1,21 @@
+{
+  "title": "Example Public Domain Novel",
+  "author": "Example Author",
+  "summary": "A fixture novel used to validate the example rule.",
+  "cover_url": "https://example-novels.test/covers/example.jpg",
+  "status": "completed",
+  "chapters": [
+    {
+      "title": "Chapter 1: Dawn",
+      "url": "https://example-novels.test/book/123/chapter/1"
+    },
+    {
+      "title": "Chapter 2: Noon",
+      "url": "https://example-novels.test/book/123/chapter/2"
+    }
+  ],
+  "chapter": {
+    "title": "Chapter 1: Dawn",
+    "content": "Morning arrived over the quiet archive.\n\nThe catalog opened with a soft click."
+  }
+}

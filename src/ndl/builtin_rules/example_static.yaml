@@ -1,0 +1,75 @@
+id: example_static
+name: Public Domain Static Site Example
+version: 1.0.0
+author: NDL team
+enabled: true
+priority: 50
+
+url_patterns:
+  - pattern: '^https?://example-novels\.test/book/\d+/?$'
+    type: regex
+
+fetcher:
+  type: http
+  headers:
+    User-Agent: "NDL/0.1 (+https://github.com/makunxiang-cmd/project_noveldownloader)"
+  rate_limit:
+    min_interval_ms: 800
+    max_concurrency: 2
+  retry:
+    attempts: 3
+    backoff: exponential
+  robots:
+    respect: true
+  encoding: auto
+
+index:
+  url_template: "{source_url}"
+  novel:
+    title:
+      selector: "h1.book-title"
+      attr: text
+    author:
+      selector: ".book-meta .author"
+      attr: text
+    summary:
+      selector: ".book-intro"
+      attr: text
+    cover:
+      selector: ".book-cover img"
+      attr: src
+      resolve: relative
+    status:
+      selector: ".book-meta .status"
+      attr: text
+      map:
+        Ongoing: ongoing
+        Completed: completed
+  chapter_list:
+    container: "#chapter-list"
+    items: "li > a"
+    title:
+      selector: "self"
+      attr: text
+    url:
+      selector: "self"
+      attr: href
+      resolve: relative
+  pagination:
+    type: none
+
+chapter:
+  title:
+    selector: "h1.chapter-title"
+    attr: text
+  content:
+    selector: "#chapter-content"
+    attr: html
+    clean:
+      remove_selectors: [".ad", "script", "style"]
+      strip_patterns:
+        - "Read more at Example.*"
+      normalize_whitespace: true
+      min_paragraph_length: 2
+  pagination:
+    type: none
