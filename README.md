@@ -10,7 +10,7 @@
 
 ## Status
 
-Under active development. P0 scaffold and P1.1–P1.4 (domain, parsers, HTTP fetcher, converters) are done; P1.5–P1.6 (services, CLI commands) are next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, and library management. See `docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md` for slice-by-slice progress.
+Under active development. P0 scaffold and P1 MVP download/convert path are implemented; P2 library persistence is next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, and library management. See `docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md` for slice-by-slice progress.
 
 ## What It Does (Planned)
 
@@ -38,11 +38,12 @@ pip install ndl
 pip install ndl[browser]
 ```
 
-## Usage Preview (Coming Soon)
+## Usage Preview
 
 ```bash
-ndl download <url> -o book.epub
+ndl download <url> -o book.epub --accept-disclaimer
 ndl convert book.txt -o book.epub
+ndl rules validate my-rule.yaml
 ndl library list
 ndl update --all
 ndl serve

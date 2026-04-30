@@ -2,7 +2,7 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
 >
-> 最后更新：2026-04-30（P1.4 TXT/EPUB 转换器切片完成；下一步 P1.5 Download/Convert 服务层）
+> 最后更新：2026-04-30（P1.6 CLI 命令切片完成；P1 MVP 下载/转换路径完成；下一步创建 P2 书库持久化计划）
 
 ---
 
@@ -23,6 +23,8 @@
 | **P1.2 HTML 解析器** | `parsers/html_index.py` + `parsers/html_chapter.py` + `HtmlParser` 类（实现 `Parser` Protocol）；契约测试改为端到端走解析器 | 见 P1 plan §P1.2 |
 | **P1.3 HTTP 抓取器** | `fetchers/http.py`（`HttpFetcher`） + `_throttle.py`（每 host 限速） + `_robots.py`（robots.txt 检查 + 缓存）；新依赖 `httpx>=0.27` 与 dev 依赖 `respx>=0.21`；`asyncio.sleep` 在测试中 monkeypatch 提速 | 见 P1 plan §P1.3 |
 | **P1.4 TXT/EPUB 转换器** | `converters/txt_writer.py` + `converters/epub_writer.py` + `converters/registry.py`；`parsers/txt_reader.py` 支持 NDL TXT 与常见章节标题；新依赖 `ebooklib>=0.20` | 见 P1 plan §P1.4 |
+| **P1.5 Download/Convert 服务层** | `application/services/download.py` 编排 Fetcher/Parser；`application/services/convert.py` 编排 Reader/Writer；`application/container.py` 提供轻量工厂；服务层进度回调已覆盖 | 见 P1 plan §P1.5 |
+| **P1.6 CLI 命令** | `ndl download` / `ndl convert` / `ndl rules validate`；download 首跑免责声明 gate；`typer.testing` + mocked HTTP 覆盖端到端下载到 EPUB | 见 P1 plan §P1.6 |
 
 ### 当前活动 Plan
 
@@ -32,16 +34,16 @@
 - P1.2 ✅ implemented
 - P1.3 ✅ implemented
 - P1.4 ✅ implemented
-- **P1.5 ⏭ next** — Download/Convert 服务层 + 进度回调
-- P1.6 ⏳ pending — CLI 命令 (`ndl download` / `ndl convert` / `ndl rules validate`) + 首跑免责声明
+- P1.5 ✅ implemented
+- P1.6 ✅ implemented
 
 ### 质量门当前状态
 
 ```
 ruff check / format     ✅
-mypy --strict (28 文件) ✅
-pytest                  ✅ 57 passed
-coverage                ✅ 91.60%（fail_under=80）
+mypy --strict (35 文件) ✅
+pytest                  ✅ 67 passed
+coverage                ✅ 92.05%（fail_under=80）
 ```
 
 每个切片必须保持以下命令全绿：
@@ -71,12 +73,14 @@ uv run pre-commit run --all-files
    - src/ndl/parsers/     ✅ P1.2 + P1.4 TXT reader
    - src/ndl/fetchers/    ✅ P1.3
    - src/ndl/converters/  ✅ P1.4
+   - src/ndl/application/ ✅ P1.5
+   - src/ndl/cli/         ✅ P1.6
 6. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
-7. 进入 plan 中下一个 pending 切片（当前为 P1.5），按其 Scope + Exit criteria 实施
-8. 完成切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
+7. P1 已完成；下一步先创建 P2 书库持久化计划，再进入实现
+8. 完成新切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
 ```
 
-### 工程风格约定（已在前 5 阶段固化，必须延续）
+### 工程风格约定（已在前 6 阶段固化，必须延续）
 
 - **子模块平铺**：每个职责一个 `.py`，私有 helper 用 `_xxx.py`，`__init__.py` 仅做 import re-export + `__all__`
 - **薄包装类**：纯函数承担逻辑（如 `parse_index(rule, html, ...)`），Protocol 实现作为绑定 rule 的薄类（如 `HtmlParser` / `HttpFetcher`）
@@ -89,20 +93,20 @@ uv run pre-commit run --all-files
 
 ---
 
-## 3. 下一步切片（P1.5）的预备信息
+## 3. 下一步（P2 书库持久化）的预备信息
 
-接手 agent 实施 P1.5 时需要注意：
+接手 agent 应先创建 P2 计划，再实施。P2 设计文档范围见 `docs/superpowers/specs/2026-04-20-ndl-design.md` §10：
 
-- `DownloadService` 应注入 `Fetcher` + `Parser`：抓 index -> 解析 `Novel` + `ChapterStub` -> 抓 chapter -> 组装带 chapters 的 `Novel`
-- `ConvertService` 应复用 `TxtReader`、`WriterRegistry` 与 `Writer` Protocol；P1.5 可以先支持 Path 输入（`.txt`）与直接 `Novel` 输入
-- 进度回调用 `core/progress.py` 的 `ProgressEvent` / `ProgressCallback`，覆盖 fetching/parsing/converting/saving 等阶段
-- 轻量 dependency container 先保持手写 dict/工厂即可，不引入外部 DI 依赖
-- 服务层测试应使用 fixture HTML / tmp_path / fake fetcher，不访问真实站点
+- `storage/`：SQLite + SQLAlchemy 2.0 Mapped style + WAL（当前尚未引入依赖）
+- `services(library)`：下载结果入库、书籍列表/详情/删除
+- `cli(library)`：`ndl library {list,show,remove}` 最小可用
+- 注意 P1 的 CLI download 当前只写输出文件，尚未自动入库；P2 应决定是否改变默认行为或新增显式选项
 
-退出条件（plan 已写明）：
+建议 P2 退出条件：
 
-- End-to-end service test：fixture HTML -> `Novel` -> output file
-- 进度回调至少覆盖关键阶段，且错误仍走现有 `NDLError` 层级
+- 下载结果可持久化到本地 SQLite
+- `ndl library list/show/remove` 有 `CliRunner` 覆盖
+- 全量质量门保持通过
 
 ---
 
@@ -115,7 +119,8 @@ uv run pre-commit run --all-files
 - ✅ 解析：`selectolax`（已落地于 P1.1 selector + P1.2 parsers）
 - ✅ 规则：YAML + Pydantic v2 schema（已落地于 P1.1）
 - ✅ EPUB：`ebooklib`（已落地于 P1.4）
-- ✅ CLI：Typer + rich（脚手架于 P0；命令将在 P1.6 补齐）
+- ✅ 服务层：Download/Convert services + lightweight container（已落地于 P1.5）
+- ✅ CLI：Typer + rich（P1.6 已补齐 download/convert/rules validate）
 - ✅ 包管理 / 构建：`uv` + `hatchling`
 - ✅ 质量工具：`ruff` + `mypy --strict` + `pytest` + `pre-commit`
 
@@ -175,8 +180,8 @@ uv run pre-commit run --all-files
 │   ├── parsers/     ✅ P1.2 + P1.4 TXT reader
 │   ├── fetchers/    ✅ P1.3
 │   ├── converters/  ✅ P1.4
-│   ├── application/ ⏳ P1.5（待创建）
-│   ├── cli/         脚手架于 P0，命令于 P1.6 补齐
+│   ├── application/ ✅ P1.5
+│   ├── cli/         ✅ P1.6
 │   └── builtin_rules/example_static.yaml             ← 测试用规则
 └── tests/
     ├── contract/                                     ← 端到端契约测试 + fixtures

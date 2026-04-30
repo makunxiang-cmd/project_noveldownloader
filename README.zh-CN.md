@@ -10,7 +10,7 @@
 
 ## 项目状态
 
-开发中。P0 脚手架与 P1.1–P1.4（领域模型、HTML/TXT 解析器、HTTP 抓取器、转换器）已完成；下一步进入 P1.5–P1.6（服务层、CLI 命令）。首发版本 v0.1 将包含 MVP 功能：下载、TXT/EPUB 转换、书库管理。切片进度见 `docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md`。
+开发中。P0 脚手架与 P1 MVP 下载/转换路径已实现；下一步进入 P2 书库持久化。首发版本 v0.1 将包含 MVP 功能：下载、TXT/EPUB 转换、书库管理。切片进度见 `docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md`。
 
 ## 功能（规划中）
 
@@ -36,11 +36,12 @@ pip install ndl
 pip install ndl[browser]
 ```
 
-## 使用预览（即将推出）
+## 使用预览
 
 ```bash
-ndl download <url> -o book.epub
+ndl download <url> -o book.epub --accept-disclaimer
 ndl convert book.txt -o book.epub
+ndl rules validate my-rule.yaml
 ndl library list
 ndl update --all
 ndl serve

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- P1.6 CLI commands: `ndl download`, `ndl convert`, and `ndl rules validate`; `download` is guarded by a first-run lawful-use disclaimer acceptance gate
+- P1.5 application services: `DownloadService`, `ConvertService`, and `ServiceContainer` compose fetchers, parsers, readers, writers, and progress callbacks
 - P1.4 TXT/EPUB converters: `TxtWriter`, `EpubWriter`, `WriterRegistry`, and `TxtReader` for standalone TXT conversion; EPUB generation is backed by `ebooklib`
 - P1.3 HTTP fetcher: `HttpFetcher` honors per-host rate limits, retry policy with fixed/exponential backoff, robots.txt enforcement, and rule-driven encoding; backed by `httpx`
 - P1.2 HTML parsers: `parse_index` produces `Novel` metadata + `ChapterStub` list, `parse_chapter` produces a cleaned `Chapter`; `HtmlParser` class binds a rule to the `Parser` Protocol
