@@ -2,7 +2,7 @@
 
 Welcome to the NDL documentation.
 
-**Status:** Under active development (P0 scaffold stage). Full content will be populated as the project advances through its roadmap.
+**Status:** Under active development. P0 scaffold and P1.1–P1.4 (domain, parsers, HTTP fetcher, converters) are done; P1.5–P1.6 (services, CLI commands) are next. Full content will be populated as the project advances through its roadmap.
 
 ## Sections
 

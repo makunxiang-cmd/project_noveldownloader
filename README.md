@@ -10,7 +10,7 @@
 
 ## Status
 
-Under active development. The project is currently in P0 scaffold stage. First release (v0.1) targets MVP features: download, TXT/EPUB convert, and library management.
+Under active development. P0 scaffold and P1.1–P1.4 (domain, parsers, HTTP fetcher, converters) are done; P1.5–P1.6 (services, CLI commands) are next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, and library management. See `docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md` for slice-by-slice progress.
 
 ## What It Does (Planned)
 

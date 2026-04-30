@@ -1,187 +1,184 @@
 # NDL 项目会话状态快照
 
-> 用途：跨会话接力的状态记录。每当用户在新会话中说 **"继续"** / **"resume"** / **"开始执行 P0 scaffold 计划"** 时，Claude Code 应先读取本文件再决定下一步动作。
+> 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
 >
-> 最后更新：2026-04-20（会话首次交接点：P0 计划已写就，等待用户完成重命名 + GitHub 仓库建立）
+> 最后更新：2026-04-30（P1.4 TXT/EPUB 转换器切片完成；下一步 P1.5 Download/Convert 服务层）
 
 ---
 
 ## 0. 项目一句话描述
 
-**NDL (NOVELDOWNLOADER)**：基于 Python 的规则驱动中文小说下载器 + 格式转换工具，MIT 开源，计划托管在 <https://github.com/makunxiang-cmd/project_noveldownloader>。
+**NDL (NOVELDOWNLOADER)**：基于 Python 的规则驱动中文小说下载器 + 格式转换工具，MIT 开源，托管在 <https://github.com/makunxiang-cmd/project_noveldownloader>。
 
 ---
 
-## 1. 已完成里程碑
+## 1. 当前进度
 
-| # | 里程碑 | 产出 | 状态 |
-|---|---|---|---|
-| M1 | 需求澄清（8 轮问答） | 对话记录 | ✅ |
-| M2 | 架构方案比选（推荐方案 B：规则驱动 + FastAPI+HTMX + APScheduler） | 用户批准"方案 B" | ✅ |
-| M3 | 设计文档分节评审（§1–§5 逐节批准） | `docs/superpowers/specs/2026-04-20-ndl-design.md`（774 行） | ✅ |
-| M4 | 设计文档自审（占位符、一致性、范围、歧义） | 已修复 3 处：部分失败语义 / download_jobs.status 分离 / §12.3 目录改名决议 | ✅ |
-| M5 | P0 脚手架实现计划 | `docs/superpowers/plans/2026-04-20-ndl-p0-scaffold.md`（10 个任务，TDD） | ✅ |
-| M6 | P0 计划自审 | 已修复 Windows 跨 shell 兼容性（Task 9 Step 1 三套语法） | ✅ |
-| M7 | 执行方式选择 | **用户选定：Subagent-Driven 模式** | ✅ |
+### 已完成
 
----
+| 阶段 | 范围 | 关键产出 |
+|---|---|---|
+| **P0 脚手架** | `pyproject.toml` / CLI 入口 / 质量工具链 / CI 矩阵 / 社区文件 / MkDocs 骨架 | 见 `docs/superpowers/plans/2026-04-20-ndl-p0-scaffold.md` |
+| **P1.1 领域 + 规则基础** | `core/`（Novel/Chapter/ChapterStub/Protocol/异常树/进度事件） + `rules/`（Pydantic schema、selector DSL、loader、resolver） + `example_static` 内置规则 + 契约 fixtures | 见 P1 plan §P1.1 |
+| **P1.2 HTML 解析器** | `parsers/html_index.py` + `parsers/html_chapter.py` + `HtmlParser` 类（实现 `Parser` Protocol）；契约测试改为端到端走解析器 | 见 P1 plan §P1.2 |
+| **P1.3 HTTP 抓取器** | `fetchers/http.py`（`HttpFetcher`） + `_throttle.py`（每 host 限速） + `_robots.py`（robots.txt 检查 + 缓存）；新依赖 `httpx>=0.27` 与 dev 依赖 `respx>=0.21`；`asyncio.sleep` 在测试中 monkeypatch 提速 | 见 P1 plan §P1.3 |
+| **P1.4 TXT/EPUB 转换器** | `converters/txt_writer.py` + `converters/epub_writer.py` + `converters/registry.py`；`parsers/txt_reader.py` 支持 NDL TXT 与常见章节标题；新依赖 `ebooklib>=0.20` | 见 P1 plan §P1.4 |
 
-## 2. 当前阻塞点（用户会话外完成）
+### 当前活动 Plan
 
-以下 3 项必须由用户在 Claude Code 会话外完成，因为 Windows 锁文件句柄 + 需要浏览器操作：
+**`docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md`** ——  P1 MVP 实施计划，6 个切片：
 
-### 🔒 Prerequisite 1：重命名项目目录
+- P1.1 ✅ implemented
+- P1.2 ✅ implemented
+- P1.3 ✅ implemented
+- P1.4 ✅ implemented
+- **P1.5 ⏭ next** — Download/Convert 服务层 + 进度回调
+- P1.6 ⏳ pending — CLI 命令 (`ndl download` / `ndl convert` / `ndl rules validate`) + 首跑免责声明
 
-**从**：`D:\个人内容\programs\NDL\`
-**到**：`D:\个人内容\programs\project_noveldownloader\`
+### 质量门当前状态
 
-PowerShell 操作：
-```powershell
-cd "D:\个人内容\programs\"
-Rename-Item -Path "NDL" -NewName "project_noveldownloader"
-Test-Path "D:\个人内容\programs\project_noveldownloader\docs\superpowers\SESSION-STATE.md"
-# 预期：True
+```
+ruff check / format     ✅
+mypy --strict (28 文件) ✅
+pytest                  ✅ 57 passed
+coverage                ✅ 91.60%（fail_under=80）
 ```
 
-### 🔒 Prerequisite 2：安装 `uv`（如果未装）
+每个切片必须保持以下命令全绿：
 
-```powershell
-uv --version   # 先探测；有输出就跳过下面的安装
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src/ndl
+uv run pytest --cov=ndl --cov-report=term --cov-report=xml
+uv run pre-commit run --all-files
 ```
-
-### 🔒 Prerequisite 3：GitHub 仓库
-
-去 <https://github.com/new> 创建：
-- Owner：`makunxiang-cmd`
-- Name：`project_noveldownloader`
-- Public，**不勾选**任何 "Add README / .gitignore / license"
-- 预期仓库 URL：`https://github.com/makunxiang-cmd/project_noveldownloader`
 
 ---
 
-## 3. 下次会话启动协议
+## 2. 下次会话启动协议
 
-### 用户应做的事
-1. 确认上面 3 项 Prerequisite 全部完成
-2. 在 `D:\个人内容\programs\project_noveldownloader\` 启动新 Claude Code 会话
-3. 发送启动指令，例如：
-
-   > 开始执行 P0 scaffold 计划，使用 Subagent-Driven 模式
-
-### Claude Code 应做的事（严格顺序）
+### 接手 agent 应做的事（严格顺序）
 
 ```
 1. Read docs/superpowers/SESSION-STATE.md（本文件）
-2. Read docs/superpowers/plans/2026-04-20-ndl-p0-scaffold.md（完整计划）
-3. 用户可能未读过 plan 摘要，简报一下 10 个任务的标题清单
-4. 确认 Prerequisite 1/2/3 完成：
-   - pwd 包含 "project_noveldownloader"（Prereq 1）
-   - uv --version 返回版本号（Prereq 2）
-   - 可选：验证 GitHub 仓库存在（`gh repo view makunxiang-cmd/project_noveldownloader`）
-5. 若任一 Prerequisite 未完成 → 停下来问用户，不要盲目推进
-6. 全部就绪 → 调用 superpowers:subagent-driven-development 技能
-7. 按 Task 1 → 2 → ... → 10 顺序派发 subagent
-   - 每个 Task 一个 fresh subagent（带上相关上下文与 TDD 步骤）
-   - subagent 完成后，当前会话做代码审查（两阶段：first-pass + 确认）
-   - 通过后提示用户 commit，然后进入下一个 Task
+2. Read docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md（活动 plan）
+3. Read AGENTS.md + docs/agents/issue-tracker.md（约定）
+4. 检查仓库状态：git log --oneline -10 + git status，确认本地工作区干净
+5. 确认本文件 §1 的"已完成"列表与代码实际情况一致：
+   - src/ndl/core/        ✅ P1.1
+   - src/ndl/rules/       ✅ P1.1
+   - src/ndl/parsers/     ✅ P1.2 + P1.4 TXT reader
+   - src/ndl/fetchers/    ✅ P1.3
+   - src/ndl/converters/  ✅ P1.4
+6. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
+7. 进入 plan 中下一个 pending 切片（当前为 P1.5），按其 Scope + Exit criteria 实施
+8. 完成切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
 ```
 
----
+### 工程风格约定（已在前 5 阶段固化，必须延续）
 
-## 4. P0 计划的 10 个任务（速览）
-
-| Task | 主题 | 核心文件 |
-|---|---|---|
-| 1 | 项目骨架 + `pyproject.toml` + 包初始化 | `pyproject.toml`, `src/ndl/__init__.py`, `src/ndl/__main__.py` |
-| 2 | CLI 入口 + `--version` 测试驱动 | `src/ndl/cli/main.py`, `tests/unit/cli/test_main.py` |
-| 3 | 质量工具链配置 | `ruff`/`mypy`/`pytest` in `pyproject.toml`, `.pre-commit-config.yaml` |
-| 4 | `.gitignore` + `.editorconfig` + git 初始化 | `.gitignore`, `.editorconfig` |
-| 5 | GitHub Actions CI 矩阵 | `.github/workflows/ci.yml`（3 OS × 3 Python） |
-| 6 | Issue/PR 模板 | `.github/ISSUE_TEMPLATE/*.md`, `.github/PULL_REQUEST_TEMPLATE.md` |
-| 7 | 法律与社区文件 | `LICENSE`（MIT）, `DISCLAIMER.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md` |
-| 8 | 双语 README + MkDocs 骨架 | `README.md`, `README.zh-CN.md`, `docs/mkdocs.yml`, `docs/index.md` |
-| 9 | 端到端验证（干净重装 + 全质量门禁） | 无新建文件，跑 ruff/mypy/pytest 全绿 |
-| 10 | 首次推送到 GitHub + 打 tag `v0.1.0-dev0` | git remote add + push |
-
-> 详细 TDD 步骤、代码片段、命令、预期输出均在 `docs/superpowers/plans/2026-04-20-ndl-p0-scaffold.md` 中。**Subagent 必须读取完整 plan，不能只依赖本摘要。**
+- **子模块平铺**：每个职责一个 `.py`，私有 helper 用 `_xxx.py`，`__init__.py` 仅做 import re-export + `__all__`
+- **薄包装类**：纯函数承担逻辑（如 `parse_index(rule, html, ...)`），Protocol 实现作为绑定 rule 的薄类（如 `HtmlParser` / `HttpFetcher`）
+- **类型严格**：mypy `--strict` 必须过；`python_version = "3.10"` —— 不要用 `Self` 等 3.11+ 语法
+- **`from __future__ import annotations`** 每个模块顶部都加
+- **零冗余注释**：模块单行 docstring + 公开函数单行 docstring；不要 WHAT 注释
+- **错误层级对齐 `core/errors.py`**：`UserError` / `RuleError` / `FetchError` / `ParseError` / `StorageError` / `ConvertError`，新错误类必须落在某个分支下
+- **测试结构镜像源码**：`tests/unit/<package>/test_<module>.py`；契约测试在 `tests/contract/`
+- **不要新增依赖除非 plan 已写明**：P1.3 加入 `httpx` + `respx`，P1.4 加入 `ebooklib`，均是 plan/设计显式要求
 
 ---
 
-## 5. 关键设计决策备忘
+## 3. 下一步切片（P1.5）的预备信息
 
-以下是设计阶段拍板的 14 条 ADR 核心决策（完整表在 spec 文档 §2）：
+接手 agent 实施 P1.5 时需要注意：
 
-- **架构**：Clean/Onion（core ← infrastructure ← application ← interfaces）
-- **HTTP 层**：`httpx` 默认，`playwright` 作为可选 extras `ndl[browser]`
-- **解析**：`selectolax` 主，`lxml` 降级
-- **规则**：YAML + Pydantic v2 schema，三层加载（builtin → remote repo → user custom）
-- **存储**：SQLite + SQLAlchemy 2.0 Mapped style + WAL 模式
-- **Web**：FastAPI + HTMX + Jinja2 + SSE，**零 Node.js**
-- **调度**：APScheduler AsyncIO
-- **CLI**：Typer + rich 进度条
-- **EPUB**：`ebooklib`
-- **日志**：`structlog`（JSON 结构化）
-- **跨平台路径**：`platformdirs`
-- **i18n**：`babel`（zh_CN + en_US）
-- **包管理 / 构建**：`uv` + `hatchling`
-- **质量工具**：`ruff` + `mypy --strict` + `pytest` + `pre-commit`
+- `DownloadService` 应注入 `Fetcher` + `Parser`：抓 index -> 解析 `Novel` + `ChapterStub` -> 抓 chapter -> 组装带 chapters 的 `Novel`
+- `ConvertService` 应复用 `TxtReader`、`WriterRegistry` 与 `Writer` Protocol；P1.5 可以先支持 Path 输入（`.txt`）与直接 `Novel` 输入
+- 进度回调用 `core/progress.py` 的 `ProgressEvent` / `ProgressCallback`，覆盖 fetching/parsing/converting/saving 等阶段
+- 轻量 dependency container 先保持手写 dict/工厂即可，不引入外部 DI 依赖
+- 服务层测试应使用 fixture HTML / tmp_path / fake fetcher，不访问真实站点
 
-**伦理硬约束（不可协商）**：
-- 严格尊重 `robots.txt`
-- 限速：每域名默认 1 请求/秒，可配置但不能关
-- 不内置：Cloudflare 绕过、商业平台（起点/番茄/晋江）、登录/验证码破解
-- CI 中用 rule-lint 强制上述约束
+退出条件（plan 已写明）：
+
+- End-to-end service test：fixture HTML -> `Novel` -> output file
+- 进度回调至少覆盖关键阶段，且错误仍走现有 `NDLError` 层级
 
 ---
 
-## 6. P1–P7 路线图（仅提醒，不展开）
+## 4. 关键设计决策备忘（持久）
 
-P0 完成后，按顺序规划：
+完整 14 条 ADR 在 `docs/superpowers/specs/2026-04-20-ndl-design.md`。当前已落地的部分：
 
-- **P1** Core 领域模型 + Pydantic schema（1 周）
-- **P2** HTTP fetcher + 规则引擎 + 第一条 demo 规则（1.5 周）
-- **P3** 存储层（SQLAlchemy repo 模式） + Download 服务（1 周）
-- **P4** CLI 命令补齐（search / download / convert / library）（1 周）
-- **P5** EPUB / TXT / Markdown 转换器（1 周）
-- **P6** FastAPI + HTMX Web UI + SSE 进度推送（1.5 周）
-- **P7** APScheduler 增量更新 + 文档站点上线（1 周）
+- ✅ 架构：Clean/Onion（core ← infrastructure ← application ← interfaces）
+- ✅ HTTP 层：`httpx` 默认（已落地于 P1.3）
+- ✅ 解析：`selectolax`（已落地于 P1.1 selector + P1.2 parsers）
+- ✅ 规则：YAML + Pydantic v2 schema（已落地于 P1.1）
+- ✅ EPUB：`ebooklib`（已落地于 P1.4）
+- ✅ CLI：Typer + rich（脚手架于 P0；命令将在 P1.6 补齐）
+- ✅ 包管理 / 构建：`uv` + `hatchling`
+- ✅ 质量工具：`ruff` + `mypy --strict` + `pytest` + `pre-commit`
 
-**MVP（P0–P4）预计 5–6 周；完整 P0–P7 约 8–10 周。**
+尚未落地（P1 之后）：
 
-每个阶段开始前重走 brainstorming → writing-plans → subagent-driven-development 流程。每份 plan 独立产出可运行软件。
+- ⏳ 存储：SQLite + SQLAlchemy 2.0 Mapped style + WAL（P2 阶段）
+- ⏳ Web：FastAPI + HTMX + Jinja2 + SSE（P5+ 阶段）
+- ⏳ 调度：APScheduler AsyncIO（P6 阶段）
+- ⏳ Playwright extras（P2+，按需）
+- ⏳ 日志：`structlog`（P2+）
+- ⏳ i18n：`babel`（P5+）
+
+**伦理硬约束（不可协商）：**
+
+- 严格尊重 `robots.txt`（schema 强制 `respect=true` 时省略 `ignore_justification`，关闭时必须填写理由 —— 已落地）
+- 限速：每域名默认 ≥ 500ms 间隔（schema 强制 `min_interval_ms >= 500`）、并发 ≤ 3（`max_concurrency <= 3`）—— 已落地
+- 不内置：Cloudflare 绕过、商业平台、登录/验证码破解
+- 永久不要把"绕过"作为 P1 之后的 backlog 项
 
 ---
 
-## 7. 用户身份与偏好（持久化要点）
+## 5. 用户身份与偏好（持久）
 
 - **GitHub**：`makunxiang-cmd`
 - **目标仓库**：`project_noveldownloader`
 - **协作语言**：中文为主
-- **流程偏好**：**先计划 → 问细节 → 再执行**；输出前要自检可靠性
+- **流程偏好**：先计划 → 问细节 → 再执行；输出前要自检可靠性
 - **决策风格**：评估完选项后倾向"按你推荐的来"，信任 Claude 的判断但要看到 trade-off
 - **开源定位**：MIT，无商业目的，合规优先
 
 ---
 
-## 8. 文件清单
+## 6. 关键文件清单
 
-会话结束时本目录应仅有以下内容（已核实）：
+接手 agent 需要熟悉的文件：
 
 ```
-D:\个人内容\programs\NDL\          ← 即将重命名为 project_noveldownloader
-├── .claude/
-│   └── settings.local.json        ← 权限白名单，保留
-├── .remember/
-│   ├── logs/autonomous/           ← Claude Code 运行时，空目录，保留
-│   └── tmp/                       ← 同上
-└── docs/
-    └── superpowers/
-        ├── SESSION-STATE.md       ← 本文件
-        ├── plans/
-        │   └── 2026-04-20-ndl-p0-scaffold.md
-        └── specs/
-            └── 2026-04-20-ndl-design.md
+.
+├── AGENTS.md                                         ← agent 协作约定入口
+├── CHANGELOG.md                                      ← 切片完成时追加
+├── docs/
+│   ├── agents/                                       ← agent 协作约定细则
+│   │   ├── domain.md
+│   │   ├── issue-tracker.md
+│   │   └── triage-labels.md
+│   └── superpowers/
+│       ├── SESSION-STATE.md                          ← 本文件
+│       ├── plans/
+│       │   ├── 2026-04-20-ndl-p0-scaffold.md         ← P0 计划（已完成）
+│       │   └── 2026-04-29-ndl-p1-mvp.md              ← 当前活动 plan
+│       └── specs/
+│           └── 2026-04-20-ndl-design.md              ← 设计基础（v0.1 全套）
+├── pyproject.toml                                    ← 依赖与质量工具配置
+├── src/ndl/
+│   ├── core/        ✅ P1.1
+│   ├── rules/       ✅ P1.1
+│   ├── parsers/     ✅ P1.2 + P1.4 TXT reader
+│   ├── fetchers/    ✅ P1.3
+│   ├── converters/  ✅ P1.4
+│   ├── application/ ⏳ P1.5（待创建）
+│   ├── cli/         脚手架于 P0，命令于 P1.6 补齐
+│   └── builtin_rules/example_static.yaml             ← 测试用规则
+└── tests/
+    ├── contract/                                     ← 端到端契约测试 + fixtures
+    └── unit/                                         ← 镜像 src/ndl 结构
 ```
-
-**P0 执行后，根目录会新增**：`pyproject.toml`、`src/`、`tests/`、`.github/`、`README.md`、`LICENSE` 等（完整清单见 plan 文件）。
