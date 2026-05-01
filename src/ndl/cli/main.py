@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, NoReturn
 
 import typer
+from rich.console import Console
+from rich.table import Table
 
 from ndl import __version__
 from ndl.application.container import ServiceContainer
 from ndl.cli.disclaimer import ensure_download_disclaimer
 from ndl.cli.renderers import cli_progress
-from ndl.core.errors import NDLError
+from ndl.core.errors import NDLError, UserError
+from ndl.core.models import Novel
 from ndl.rules import load_rule_file
+from ndl.storage import NovelSummary
 
 app = typer.Typer(
     name="ndl",
@@ -22,6 +27,7 @@ app = typer.Typer(
     add_completion=False,
 )
 rules_app = typer.Typer(help="Rule file utilities.", no_args_is_help=True)
+library_app = typer.Typer(help="Local library commands.", no_args_is_help=True)
 
 
 def _version_callback(value: bool) -> None:
@@ -94,14 +100,74 @@ def download(
             help="Accept the lawful-use download disclaimer for this machine.",
         ),
     ] = False,
+    save: Annotated[
+        bool,
+        typer.Option(
+            "--save/--no-save",
+            help="Save the downloaded novel into the local library.",
+        ),
+    ] = True,
 ) -> None:
     """Download a rule-matched novel and write it to TXT or EPUB."""
     try:
         ensure_download_disclaimer(accept=accept_disclaimer)
-        written = asyncio.run(_download(url, output_path, target_format=target_format))
+        written, novel_id = asyncio.run(
+            _download(url, output_path, target_format=target_format, save=save)
+        )
     except NDLError as exc:
         _raise_cli_error(exc)
     typer.echo(f"Wrote {written}")
+    if novel_id is not None:
+        typer.echo(f"Saved to library: {novel_id}")
+
+
+@library_app.command("list")
+def library_list() -> None:
+    """List saved novels in the local library."""
+    try:
+        summaries = ServiceContainer().library_service().list()
+    except NDLError as exc:
+        _raise_cli_error(exc)
+    if not summaries:
+        typer.echo("No library entries.")
+        return
+    _console().print(_library_table(summaries))
+
+
+@library_app.command("show")
+def library_show(
+    novel_id: Annotated[int, typer.Argument(min=1, help="Library novel id.")],
+) -> None:
+    """Show a saved novel header and chapter list."""
+    try:
+        novel = _load_library_novel(novel_id)
+    except NDLError as exc:
+        _raise_cli_error(exc)
+    _print_library_novel(novel_id, novel)
+
+
+@library_app.command("remove")
+def library_remove(
+    novel_id: Annotated[int, typer.Argument(min=1, help="Library novel id.")],
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Remove without asking for confirmation."),
+    ] = False,
+) -> None:
+    """Remove a saved novel from the local library."""
+    try:
+        container = ServiceContainer()
+        library = container.library_service()
+        novel = library.get(novel_id)
+        if novel is None:
+            raise UserError("Library entry not found.", detail=f"ID: {novel_id}")
+    except NDLError as exc:
+        _raise_cli_error(exc)
+    if not yes and not typer.confirm(f"Remove '{novel.title}' from the library?"):
+        typer.echo("Aborted.")
+        raise typer.Exit(1)
+    library.remove(novel_id)
+    typer.echo(f"Removed library entry: {novel_id}")
 
 
 @rules_app.command("validate")
@@ -126,15 +192,24 @@ def rules_validate(
 
 
 app.add_typer(rules_app, name="rules")
+app.add_typer(library_app, name="library")
 
 
-async def _download(url: str, output_path: Path, *, target_format: str | None) -> Path:
+async def _download(
+    url: str,
+    output_path: Path,
+    *,
+    target_format: str | None,
+    save: bool,
+) -> tuple[Path, int | None]:
     container = ServiceContainer()
     async with cli_progress() as progress:
         novel = await container.download(url, progress=progress)
-        return await container.convert_service(progress=progress).convert(
+        written = await container.convert_service(progress=progress).convert(
             novel, output_path, target_format=target_format
         )
+    novel_id = container.library_service().save(novel) if save else None
+    return written, novel_id
 
 
 async def _convert(input_path: Path, output_path: Path, *, target_format: str | None) -> Path:
@@ -148,3 +223,61 @@ async def _convert(input_path: Path, output_path: Path, *, target_format: str | 
 def _raise_cli_error(exc: NDLError) -> NoReturn:
     typer.echo(exc.user_message(), err=True)
     raise typer.Exit(exc.exit_code)
+
+
+def _load_library_novel(novel_id: int) -> Novel:
+    novel = ServiceContainer().library_service().get(novel_id)
+    if novel is None:
+        raise UserError("Library entry not found.", detail=f"ID: {novel_id}")
+    return novel
+
+
+def _console() -> Console:
+    console = Console()
+    return console if console.is_terminal else Console(width=140)
+
+
+def _library_table(summaries: list[NovelSummary]) -> Table:
+    table = Table()
+    table.add_column("id", justify="right")
+    table.add_column("title")
+    table.add_column("author")
+    table.add_column("status")
+    table.add_column("chapter_count", justify="right")
+    table.add_column("fetched_at")
+    for summary in summaries:
+        table.add_row(
+            str(summary.id),
+            summary.title,
+            summary.author,
+            summary.status,
+            str(summary.chapter_count),
+            _format_datetime(summary.fetched_at),
+        )
+    return table
+
+
+def _print_library_novel(novel_id: int, novel: Novel) -> None:
+    console = _console()
+    console.print(f"[bold]{novel.title}[/bold]")
+    console.print(f"id: {novel_id}")
+    console.print(f"author: {novel.author}")
+    console.print(f"status: {novel.status}")
+    console.print(f"source_rule_id: {novel.source_rule_id}")
+    if novel.source_url:
+        console.print(f"source_url: {novel.source_url}")
+    console.print(f"fetched_at: {_format_datetime(novel.fetched_at)}")
+    if novel.summary:
+        console.print(f"summary: {novel.summary}")
+
+    table = Table(title="Chapters")
+    table.add_column("index", justify="right")
+    table.add_column("title")
+    table.add_column("words", justify="right")
+    for chapter in novel.chapters:
+        table.add_row(str(chapter.index), chapter.title, str(chapter.word_count))
+    console.print(table)
+
+
+def _format_datetime(value: datetime) -> str:
+    return value.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")

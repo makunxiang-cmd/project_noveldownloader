@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -11,7 +12,9 @@ import respx
 from typer.testing import CliRunner
 
 from ndl import __version__
+from ndl.application.container import ServiceContainer
 from ndl.cli.main import app
+from ndl.core.models import Chapter, Novel
 
 runner = CliRunner()
 BASE_URL = "https://example-novels.test/book/123"
@@ -94,6 +97,80 @@ def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
 @respx.mock
 def test_download_command_writes_epub_against_mocked_http(tmp_path) -> None:
     output_path = tmp_path / "downloaded.epub"
+    ndl_home = tmp_path / "ndl-home"
+    _mock_example_download()
+
+    result = runner.invoke(
+        app,
+        ["download", BASE_URL, "-o", str(output_path), "--accept-disclaimer"],
+        env={"NDL_HOME": str(ndl_home)},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Wrote" in result.output
+    assert "Saved to library: 1" in result.output
+    with ZipFile(output_path) as archive:
+        assert "OEBPS/content.opf" in archive.namelist()
+        assert "OEBPS/Text/chapter_0001.xhtml" in archive.namelist()
+        assert "Example Public Domain Novel" in archive.read("OEBPS/content.opf").decode("utf-8")
+
+    list_result = runner.invoke(app, ["library", "list"], env={"NDL_HOME": str(ndl_home)})
+    assert list_result.exit_code == 0, list_result.output
+    assert "Example Public Domain Novel" in list_result.output
+    assert "Example Author" in list_result.output
+
+
+@respx.mock
+def test_download_no_save_skips_library(tmp_path) -> None:
+    output_path = tmp_path / "downloaded.epub"
+    ndl_home = tmp_path / "ndl-home"
+    _mock_example_download()
+
+    result = runner.invoke(
+        app,
+        ["download", BASE_URL, "-o", str(output_path), "--accept-disclaimer", "--no-save"],
+        env={"NDL_HOME": str(ndl_home)},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Wrote" in result.output
+    assert "Saved to library" not in result.output
+
+    list_result = runner.invoke(app, ["library", "list"], env={"NDL_HOME": str(ndl_home)})
+    assert list_result.exit_code == 0, list_result.output
+    assert "No library entries." in list_result.output
+
+
+def test_library_show_and_remove_commands(tmp_path) -> None:
+    ndl_home = tmp_path / "ndl-home"
+    novel_id = _seed_library(ndl_home)
+
+    show_result = runner.invoke(
+        app,
+        ["library", "show", str(novel_id)],
+        env={"NDL_HOME": str(ndl_home)},
+    )
+
+    assert show_result.exit_code == 0, show_result.output
+    assert "Seed Novel" in show_result.output
+    assert "First Chapter" in show_result.output
+    assert "secret body" not in show_result.output
+
+    remove_result = runner.invoke(
+        app,
+        ["library", "remove", str(novel_id), "--yes"],
+        env={"NDL_HOME": str(ndl_home)},
+    )
+
+    assert remove_result.exit_code == 0, remove_result.output
+    assert f"Removed library entry: {novel_id}" in remove_result.output
+
+    list_result = runner.invoke(app, ["library", "list"], env={"NDL_HOME": str(ndl_home)})
+    assert list_result.exit_code == 0, list_result.output
+    assert "No library entries." in list_result.output
+
+
+def _mock_example_download() -> None:
     chapter_one = (FIXTURE_DIR / "chapter.html").read_text(encoding="utf-8")
     chapter_two = chapter_one.replace("Chapter 1: Dawn", "Chapter 2: Noon").replace(
         "Morning arrived over the quiet archive.",
@@ -111,15 +188,19 @@ def test_download_command_writes_epub_against_mocked_http(tmp_path) -> None:
     respx.get(f"{BASE_URL}/chapter/1").mock(return_value=httpx.Response(200, text=chapter_one))
     respx.get(f"{BASE_URL}/chapter/2").mock(return_value=httpx.Response(200, text=chapter_two))
 
-    result = runner.invoke(
-        app,
-        ["download", BASE_URL, "-o", str(output_path), "--accept-disclaimer"],
-        env={"NDL_HOME": str(tmp_path / "ndl-home")},
-    )
 
-    assert result.exit_code == 0, result.output
-    assert "Wrote" in result.output
-    with ZipFile(output_path) as archive:
-        assert "OEBPS/content.opf" in archive.namelist()
-        assert "OEBPS/Text/chapter_0001.xhtml" in archive.namelist()
-        assert "Example Public Domain Novel" in archive.read("OEBPS/content.opf").decode("utf-8")
+def _seed_library(ndl_home: Path) -> int:
+    service = ServiceContainer(rules=[], db_path=ndl_home / "library.db").library_service()
+    return service.save(
+        Novel(
+            title="Seed Novel",
+            author="Seed Author",
+            source_url="https://example.com/seed",
+            source_rule_id="example_static",
+            chapters=[
+                Chapter(index=0, title="First Chapter", content="secret body"),
+                Chapter(index=1, title="Second Chapter", content="more secret body"),
+            ],
+            fetched_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+        )
+    )

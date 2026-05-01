@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- P2.4 library CLI: `ndl library list`, `ndl library show <id>`, and `ndl library remove <id> --yes`; list/show render Rich tables and `show` omits chapter bodies
+- P2.4 CLI persistence coverage: `CliRunner` tests now isolate `library.db` with `NDL_HOME`, verify download auto-save, verify `--no-save`, and cover show/remove lifecycle
 - P2.3 `LibraryService` (`src/ndl/application/services/library.py`): thin domain-facing wrapper over `LibraryRepository` with `save`/`list`/`get`/`remove`; `ServiceContainer` exposes a singleton `library_service()` that lazily provisions a SQLite engine + sessionmaker on first use
 - P2.3 shared path helpers (`src/ndl/application/paths.py`): `ndl_home()` (respects `NDL_HOME`) and `library_db_path()` (`<NDL_HOME>/library.db`); `cli/disclaimer.py` now reuses them instead of re-implementing the resolution
 - P2.2 `LibraryRepository` (`src/ndl/storage/repository.py`): upsert-on-`(source_rule_id, source_url)` `save`, `list` with chapter counts, full-novel `get`, and cascade-deleting `remove`; introduces lightweight `NovelSummary` dataclass for list views
@@ -30,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- README status and usage now reflect that P2 library persistence is implemented and P3 Web UI is next
+- `ndl download` now saves successful downloads into the local SQLite library after writing the requested output file; pass `--no-save` to preserve the old file-only behavior
 - P0 scaffold (project structure, CI, lint/type/test tooling, MkDocs skeleton, `ndl --version`, community files, issue/PR templates, GitHub Actions CI matrix) is now complete; previously listed under "Changed" by mistake
 - Documentation reflects P1 completion, current CLI capabilities, and the P2 library persistence handoff plan
 - Contract test for bundled rules now exercises the parsers end-to-end instead of selector helpers directly

@@ -10,13 +10,14 @@
 
 ## Status
 
-Under active development. P0 scaffold and the P1 MVP download/convert path are implemented; P2 library persistence is next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, and library management. See `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
+Under active development. P0 scaffold, P1 MVP download/convert, and P2 library persistence are implemented; P3 Web UI is next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, library management, and a local Web UI. See `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
 
 ## What Works Now
 
 - Validate YAML source rules with `ndl rules validate`
 - Download a rule-matched static HTML fixture site to TXT or EPUB
 - Convert local TXT files to TXT or EPUB
+- Manage the local SQLite library with `ndl library list/show/remove`
 - Enforce robots.txt, per-host rate limits, retries, and a first-run lawful-use disclaimer for downloads
 
 ## What It Does (Roadmap)
@@ -52,13 +53,13 @@ The package has not been released to PyPI yet.
 ```bash
 ndl download <url> -o book.epub --accept-disclaimer
 ndl convert book.txt -o book.epub
+ndl library list
 ndl rules validate my-rule.yaml
 ```
 
-Planned for P2+:
+Planned for P3+:
 
 ```bash
-ndl library list
 ndl update --all
 ndl serve
 ```

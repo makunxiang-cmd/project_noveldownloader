@@ -1,6 +1,6 @@
 # NDL P2 Library Persistence Plan
 
-> Status: planned. Start here after P1. P2 adds local SQLite persistence and `ndl library` commands while preserving the P1 download/convert behavior.
+> Status: implemented. P2 adds local SQLite persistence and `ndl library` commands while preserving the P1 download/convert behavior.
 
 ## Goal
 
@@ -86,14 +86,14 @@ Exit criteria:
 Notes:
 
 - `LibraryService` is a thin pass-through over `LibraryRepository`; the bulk of behavior already lives in P2.2.
-- "export" was deferred to P2.4: the CLI will compose `library_service().get(id)` with `convert_service().convert(novel, output_path, target_format=...)` rather than baking export into the service. The two existing services already cover the orchestration cleanly.
+- "export" stayed out of P2.4 scope; a future CLI export command can compose `library_service().get(id)` with `convert_service().convert(novel, output_path, target_format=...)` rather than baking export into the service.
 - `DownloadService` is unchanged in P2.3. Auto-save is wired in P2.4 at the CLI layer (default on, `--no-save` opt-out).
 - New `application/paths.py` owns `ndl_home()` and `library_db_path()`; `cli/disclaimer.py` now imports from there. `ServiceContainer.library_service()` lazily creates the engine on first call (so commands that don't touch the library, e.g. `ndl rules validate`, never create `~/.ndl/`).
 - `ServiceContainer` accepts `db_path: Path | None = None` for tests/CLI overrides; default is `library_db_path()`.
 
 ### P2.4 CLI Library Commands
 
-Status: pending.
+Status: implemented.
 
 Scope:
 
@@ -107,11 +107,18 @@ Exit criteria:
 - `typer.testing.CliRunner` tests pass
 - Commands operate on a `tmp_path` SQLite DB
 
+Notes:
+
+- `src/ndl/cli/main.py` now registers a `library` Typer sub-app with `list`, `show`, and `remove`.
+- `ndl library list` renders `id / title / author / status / chapter_count / fetched_at` summaries from `LibraryService.list()`.
+- `ndl library show <id>` renders novel header fields and chapter titles/word counts without printing chapter bodies.
+- `ndl library remove <id>` deletes through `LibraryService.remove()` and supports `--yes` / `-y` to skip confirmation.
+- `ndl download` saves the downloaded `Novel` to the local library after the output file is written; `--no-save` keeps the old file-only behavior.
+- CLI tests use `NDL_HOME=tmp_path/ndl-home` and mocked HTTP routes to verify download auto-save, opt-out, show, and remove.
+
 ## Open Decisions
 
-- Whether `ndl download` should auto-save by default in P2 or require an explicit library option.
 - Whether the disclaimer marker should stay as `~/.ndl/disclaimer.accepted` or migrate into a settings table/config file.
-- Whether to include `download_jobs` in P2.1 or defer job history until update/retry work.
 
 ## Quality Gates
 
