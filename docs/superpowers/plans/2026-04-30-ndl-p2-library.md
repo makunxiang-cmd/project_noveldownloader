@@ -24,7 +24,7 @@ P2 should keep network behavior compliant with the P1 robots/rate-limit/disclaim
 
 ### P2.1 Storage Foundation
 
-Status: pending.
+Status: implemented.
 
 Scope:
 
@@ -38,6 +38,12 @@ Exit criteria:
 
 - A temporary SQLite DB can create all P2 tables
 - Quality gates remain green
+
+Notes:
+
+- Mapped classes are suffixed `Row` (`NovelRow`, `ChapterRow`, `DownloadJobRow`, `SettingRow`) so the ORM layer never collides with the domain models in `ndl.core.models`. Repository round-trip lives in P2.2.
+- `download_jobs` is created in P2.1 even though no job rows are written yet, so the schema is stable before P2.2 begins.
+- `chapters."index"` is force-quoted via `mapped_column("index", ..., quote=True)` to avoid SQL keyword surprises across dialects.
 
 ### P2.2 Library Repository
 

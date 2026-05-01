@@ -2,7 +2,7 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
 >
-> 最后更新：2026-04-30（P1 MVP 完成 + 一轮全面审计修复：CLI 走容器并接 rich 进度、章节并发、429 Retry-After、UA 单一来源、Novel.source_url 可空、删私有 HTTPStatus 访问、CHANGELOG 重新分类、spec §2.1/§8.1 与扁平实现对齐、新增 CONTEXT.md + ADR-0001。下一步进入 P2.1）
+> 最后更新：2026-05-01（P2.1 存储基础完成：新增 sqlalchemy>=2 依赖、`src/ndl/storage/` 包、SQLite WAL + foreign_keys PRAGMA 默认、4 张 SQLAlchemy 2.0 Mapped 表（novels/chapters/download_jobs/settings）、session_scope 上下文管理器，8 个新单测全部通过；总测试 80 passed，覆盖率 89.66%。下一步进入 P2.2 LibraryRepository）
 
 ---
 
@@ -25,6 +25,7 @@
 | **P1.4 TXT/EPUB 转换器** | `converters/txt_writer.py` + `converters/epub_writer.py` + `converters/registry.py`；`parsers/txt_reader.py` 支持 NDL TXT 与常见章节标题；新依赖 `ebooklib>=0.20` | 见 P1 plan §P1.4 |
 | **P1.5 Download/Convert 服务层** | `application/services/download.py` 编排 Fetcher/Parser；`application/services/convert.py` 编排 Reader/Writer；`application/container.py` 提供轻量工厂；服务层进度回调已覆盖 | 见 P1 plan §P1.5 |
 | **P1.6 CLI 命令** | `ndl download` / `ndl convert` / `ndl rules validate`；download 首跑免责声明 gate；`typer.testing` + mocked HTTP 覆盖端到端下载到 EPUB | 见 P1 plan §P1.6 |
+| **P2.1 存储基础** | `src/ndl/storage/`：engine 工厂（WAL + foreign_keys=ON PRAGMA）、`session_scope` 上下文管理器、SQLAlchemy 2.0 Mapped 模型 4 张表（`NovelRow` / `ChapterRow` / `DownloadJobRow` / `SettingRow`）；新依赖 `sqlalchemy>=2.0`；8 个新 unit test 覆盖 schema、PRAGMA、唯一约束、级联删除、settings KV、status check | 见 P2 plan §P2.1 |
 
 ### 当前活动 Plan
 
@@ -37,10 +38,10 @@
 - P1.5 ✅ implemented
 - P1.6 ✅ implemented
 
-当前待执行计划：**`docs/superpowers/plans/2026-04-30-ndl-p2-library.md`** —— P2 书库持久化计划：
+当前活动计划：**`docs/superpowers/plans/2026-04-30-ndl-p2-library.md`** —— P2 书库持久化计划：
 
-- **P2.1 ⏭ next** — SQLite/SQLAlchemy 存储基础
-- P2.2 ⏳ pending — LibraryRepository
+- P2.1 ✅ implemented — SQLite/SQLAlchemy 存储基础
+- **P2.2 ⏭ next** — LibraryRepository（`storage/repository.py`，Novel/Chapter ↔ Row 双向映射）
 - P2.3 ⏳ pending — LibraryService
 - P2.4 ⏳ pending — `ndl library` CLI 命令
 
@@ -48,9 +49,9 @@
 
 ```
 ruff check / format     ✅
-mypy --strict (36 文件) ✅
-pytest                  ✅ 72 passed
-coverage                ✅ 89.27%（fail_under=80）
+mypy --strict (39 文件) ✅
+pytest                  ✅ 80 passed
+coverage                ✅ 89.66%（fail_under=80）
 ```
 
 ### 本轮（2026-04-30）审计修复要点
@@ -112,8 +113,9 @@ uv run pre-commit run --all-files
    - src/ndl/converters/  ✅ P1.4
    - src/ndl/application/ ✅ P1.5
    - src/ndl/cli/         ✅ P1.6
+   - src/ndl/storage/     ✅ P2.1
 6. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
-7. P1 已完成；下一步进入 P2.1 Storage Foundation
+7. P2.1 已完成；下一步进入 P2.2 LibraryRepository
 8. 完成新切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
 ```
 
@@ -130,14 +132,20 @@ uv run pre-commit run --all-files
 
 ---
 
-## 3. 下一步（P2 书库持久化）的预备信息
+## 3. 下一步（P2.2 LibraryRepository）的预备信息
 
-接手 agent 应按 `docs/superpowers/plans/2026-04-30-ndl-p2-library.md` 实施 P2.1。P2 设计文档范围见 `docs/superpowers/specs/2026-04-20-ndl-design.md` §10：
+接手 agent 应按 `docs/superpowers/plans/2026-04-30-ndl-p2-library.md` 实施 P2.2。基础已经就绪：
 
-- `storage/`：SQLite + SQLAlchemy 2.0 Mapped style + WAL（当前尚未引入依赖）
-- `services(library)`：下载结果入库、书籍列表/详情/删除
-- `cli(library)`：`ndl library {list,show,remove}` 最小可用
-- 注意 P1 的 CLI download 当前只写输出文件，尚未自动入库；P2 应决定是否改变默认行为或新增显式选项
+- `src/ndl/storage/`：engine 工厂 + session_scope + 4 张 Mapped 表已上线（P2.1 完成）
+- 下一步要写：`src/ndl/storage/repository.py`，提供 `LibraryRepository`（save/list/get/remove novel + 章节级联），以及 `Novel`/`Chapter` 与 `NovelRow`/`ChapterRow` 的双向映射
+
+P2.2 之后还有：
+
+- P2.3 LibraryService：服务层方法 save/list/get/remove；决定 download 是否默认入库
+- P2.4 CLI：`ndl library list/show/remove`
+- 待决策（已锁定方向）：
+  - download 默认自动入库，提供 `--no-save` 退出口（P2.4 落地）
+  - DB 路径 `~/.ndl/library.db`（与免责声明 marker 同位置，复用 `NDL_HOME`）
 
 建议 P2 退出条件：
 
@@ -161,9 +169,9 @@ uv run pre-commit run --all-files
 - ✅ 包管理 / 构建：`uv` + `hatchling`
 - ✅ 质量工具：`ruff` + `mypy --strict` + `pytest` + `pre-commit`
 
-尚未落地（P1 之后）：
+尚未落地（P2 之后）：
 
-- ⏳ 存储：SQLite + SQLAlchemy 2.0 Mapped style + WAL（P2 阶段）
+- ✅ 存储：SQLite + SQLAlchemy 2.0 Mapped style + WAL（P2.1 已落地，仓储/服务/CLI 在 P2.2–P2.4）
 - ⏳ Web：FastAPI + HTMX + Jinja2 + SSE（P5+ 阶段）
 - ⏳ 调度：APScheduler AsyncIO（P6 阶段）
 - ⏳ Playwright extras（P2+，按需）
@@ -220,6 +228,7 @@ uv run pre-commit run --all-files
 │   ├── converters/  ✅ P1.4
 │   ├── application/ ✅ P1.5
 │   ├── cli/         ✅ P1.6
+│   ├── storage/     ✅ P2.1
 │   └── builtin_rules/example_static.yaml             ← 测试用规则
 └── tests/
     ├── contract/                                     ← 端到端契约测试 + fixtures
