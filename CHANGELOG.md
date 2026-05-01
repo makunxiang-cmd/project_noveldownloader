@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI workflow (`.github/workflows/ci.yml`) now skips runs when a push or PR only touches docs/license/editor metadata (`**/*.md`, `docs/**`, `site/**`, `LICENSE`, `.gitignore`, `.editorconfig`); any source/test/dependency change still triggers the full lint + 9-cell test matrix. Note: do **not** mark CI as a required check on `main` branch protection until the skipped runs are accounted for, otherwise doc-only PRs will block on a never-reported status.
+
 ### Added
 
 - P4.3 Web update controls: homepage `Update all` action, `/updates` result page, and Web tests covering append-only update results plus empty-library status

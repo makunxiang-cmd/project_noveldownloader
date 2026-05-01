@@ -35,6 +35,12 @@ uv run pre-commit run --all-files
 
 All slices should keep these gates green.
 
+### CI behavior
+
+`.github/workflows/ci.yml` runs lint + a 3-OS × 3-Python test matrix on every push/PR to `main`, **except** when the change touches only docs or metadata. The `paths-ignore` list covers `**/*.md`, `docs/**`, `site/**`, `LICENSE`, `.gitignore`, and `.editorconfig`. Any other path (including `pyproject.toml`, `uv.lock`, the workflow file itself, or anything under `src/` or `tests/`) re-enables the full run.
+
+If you later add CI as a required check under `main` branch protection, switch the doc-only paths to a skip job (a no-op job with the same name as the required check) instead of `paths-ignore` — otherwise doc-only PRs will block on a check that never reports.
+
 ## Architecture Map
 
 - `src/ndl/core/`: domain objects, protocols, progress events, and error hierarchy
