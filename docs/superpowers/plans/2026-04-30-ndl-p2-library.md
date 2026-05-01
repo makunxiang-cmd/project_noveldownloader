@@ -70,7 +70,7 @@ Notes:
 
 ### P2.3 Library Service
 
-Status: pending.
+Status: implemented.
 
 Scope:
 
@@ -82,6 +82,14 @@ Exit criteria:
 
 - Service tests cover save/list/show/remove
 - P1 download/convert tests still pass
+
+Notes:
+
+- `LibraryService` is a thin pass-through over `LibraryRepository`; the bulk of behavior already lives in P2.2.
+- "export" was deferred to P2.4: the CLI will compose `library_service().get(id)` with `convert_service().convert(novel, output_path, target_format=...)` rather than baking export into the service. The two existing services already cover the orchestration cleanly.
+- `DownloadService` is unchanged in P2.3. Auto-save is wired in P2.4 at the CLI layer (default on, `--no-save` opt-out).
+- New `application/paths.py` owns `ndl_home()` and `library_db_path()`; `cli/disclaimer.py` now imports from there. `ServiceContainer.library_service()` lazily creates the engine on first call (so commands that don't touch the library, e.g. `ndl rules validate`, never create `~/.ndl/`).
+- `ServiceContainer` accepts `db_path: Path | None = None` for tests/CLI overrides; default is `library_db_path()`.
 
 ### P2.4 CLI Library Commands
 

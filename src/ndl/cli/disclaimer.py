@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from ndl.application.paths import ndl_home
 from ndl.core.errors import InvalidArgumentError
 
 _ACCEPTED_FILE = "disclaimer.accepted"
 _ENV_ACCEPT = "NDL_ACCEPT_DISCLAIMER"
-_ENV_HOME = "NDL_HOME"
 _TRUTHY = {"1", "true", "yes", "y", "on"}
 
 
@@ -29,11 +29,4 @@ def ensure_download_disclaimer(*, accept: bool) -> None:
 
 
 def _disclaimer_marker() -> Path:
-    return _ndl_home() / _ACCEPTED_FILE
-
-
-def _ndl_home() -> Path:
-    configured = os.environ.get(_ENV_HOME)
-    if configured:
-        return Path(configured).expanduser()
-    return Path.home() / ".ndl"
+    return ndl_home() / _ACCEPTED_FILE

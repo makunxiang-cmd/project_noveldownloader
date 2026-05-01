@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- P2.3 `LibraryService` (`src/ndl/application/services/library.py`): thin domain-facing wrapper over `LibraryRepository` with `save`/`list`/`get`/`remove`; `ServiceContainer` exposes a singleton `library_service()` that lazily provisions a SQLite engine + sessionmaker on first use
+- P2.3 shared path helpers (`src/ndl/application/paths.py`): `ndl_home()` (respects `NDL_HOME`) and `library_db_path()` (`<NDL_HOME>/library.db`); `cli/disclaimer.py` now reuses them instead of re-implementing the resolution
 - P2.2 `LibraryRepository` (`src/ndl/storage/repository.py`): upsert-on-`(source_rule_id, source_url)` `save`, `list` with chapter counts, full-novel `get`, and cascade-deleting `remove`; introduces lightweight `NovelSummary` dataclass for list views
 - P2.1 storage foundation: `src/ndl/storage/` with SQLAlchemy 2.0 Mapped models (`NovelRow`, `ChapterRow`, `DownloadJobRow`, `SettingRow`), engine factory with `journal_mode=WAL` + `foreign_keys=ON` PRAGMAs, sessionmaker, and a `session_scope` helper; new dependency `sqlalchemy>=2.0`
 - P1.6 CLI commands: `ndl download`, `ndl convert`, and `ndl rules validate`; `download` is guarded by a first-run lawful-use disclaimer acceptance gate

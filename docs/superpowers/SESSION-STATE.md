@@ -2,7 +2,7 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
 >
-> 最后更新：2026-05-01（P2.2 LibraryRepository 完成：upsert-by-(rule_id, source_url) 的 save、list 摘要、get 带章节、remove 级联；新增 NovelSummary dataclass；9 个新单测；总测试 89 passed，覆盖率 90.24%。下一步进入 P2.3 LibraryService）
+> 最后更新：2026-05-01（P2.3 LibraryService + ServiceContainer 接线完成：薄包装 LibraryService 暴露 save/list/get/remove；container 加 db_path 参数与 lazy library_service()；新增 application/paths.py（ndl_home + library_db_path），disclaimer 改用共享 helper；10 个新单测；总测试 99 passed，覆盖率 90.55%。下一步进入 P2.4 ndl library CLI）
 
 ---
 
@@ -27,6 +27,7 @@
 | **P1.6 CLI 命令** | `ndl download` / `ndl convert` / `ndl rules validate`；download 首跑免责声明 gate；`typer.testing` + mocked HTTP 覆盖端到端下载到 EPUB | 见 P1 plan §P1.6 |
 | **P2.1 存储基础** | `src/ndl/storage/`：engine 工厂（WAL + foreign_keys=ON PRAGMA）、`session_scope` 上下文管理器、SQLAlchemy 2.0 Mapped 模型 4 张表（`NovelRow` / `ChapterRow` / `DownloadJobRow` / `SettingRow`）；新依赖 `sqlalchemy>=2.0`；8 个新 unit test 覆盖 schema、PRAGMA、唯一约束、级联删除、settings KV、status check | 见 P2 plan §P2.1 |
 | **P2.2 LibraryRepository** | `src/ndl/storage/repository.py`：`LibraryRepository` 提供 save/list/get/remove；upsert 锚点 `(source_rule_id, source_url)`，章节替换走 `clear() + flush` 再 insert 避免 UNIQUE 冲突；list 走 `func.count` 单查询返回 `NovelSummary` 摘要；9 个新 unit test 覆盖 round-trip / upsert / 无 source_url 总插入 / list 计数 / 缺失返回 None / remove 级联 | 见 P2 plan §P2.2 |
+| **P2.3 LibraryService + 容器接线** | `src/ndl/application/services/library.py`：薄包装 `LibraryRepository`；`application/paths.py` 暴露 `ndl_home()` + `library_db_path()`，`cli/disclaimer.py` 改用共享 helper；`ServiceContainer` 加 `db_path` 参数 + 懒加载 `library_service()`（rules validate 等命令不会创建 `~/.ndl/`）；10 个新 unit test 覆盖 service 方法、paths 的 NDL_HOME override、container 单例 | 见 P2 plan §P2.3 |
 
 ### 当前活动 Plan
 
@@ -43,16 +44,16 @@
 
 - P2.1 ✅ implemented — SQLite/SQLAlchemy 存储基础
 - P2.2 ✅ implemented — LibraryRepository（save/list/get/remove + Novel↔Row 双向映射）
-- **P2.3 ⏭ next** — LibraryService（应用层 + 决定 download 是否默认入库）
-- P2.4 ⏳ pending — `ndl library` CLI 命令
+- P2.3 ✅ implemented — LibraryService + ServiceContainer.library_service()
+- **P2.4 ⏭ next** — `ndl library list/show/remove` CLI + download 默认入库 + `--no-save` 退出口
 
 ### 质量门当前状态
 
 ```
 ruff check / format     ✅
-mypy --strict (40 文件) ✅
-pytest                  ✅ 89 passed
-coverage                ✅ 90.24%（fail_under=80）
+mypy --strict (42 文件) ✅
+pytest                  ✅ 99 passed
+coverage                ✅ 90.55%（fail_under=80）
 ```
 
 ### 本轮（2026-04-30）审计修复要点
@@ -116,7 +117,7 @@ uv run pre-commit run --all-files
    - src/ndl/cli/         ✅ P1.6
    - src/ndl/storage/     ✅ P2.1
 6. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
-7. P2.2 已完成；下一步进入 P2.3 LibraryService
+7. P2.3 已完成；下一步进入 P2.4 `ndl library` CLI + download 默认入库
 8. 完成新切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
 ```
 
@@ -133,20 +134,22 @@ uv run pre-commit run --all-files
 
 ---
 
-## 3. 下一步（P2.3 LibraryService）的预备信息
+## 3. 下一步（P2.4 `ndl library` CLI + download 默认入库）的预备信息
 
-接手 agent 应按 `docs/superpowers/plans/2026-04-30-ndl-p2-library.md` 实施 P2.3。基础已经就绪：
+接手 agent 应按 `docs/superpowers/plans/2026-04-30-ndl-p2-library.md` 实施 P2.4。基础已经就绪：
 
-- `src/ndl/storage/`：engine 工厂 + session_scope + 4 张 Mapped 表 + LibraryRepository（P2.1+P2.2 完成）
-- 下一步要写：`src/ndl/application/services/library.py`，提供 `LibraryService`（save/list/get/remove/export 等），并决定下载结果如何流入仓储
-- 同步要做的接线：`ServiceContainer` 注入 `LibraryRepository`（按 `~/.ndl/library.db` 路径解析，复用 `NDL_HOME`）
+- 应用层：`ServiceContainer.library_service()` 已暴露，DB 路径默认 `~/.ndl/library.db`，`db_path=...` 可被 CLI 测试覆盖（CliRunner 通过 `NDL_HOME` env 即可）
+- 仓储已经支持完整 CRUD；list 摘要、get 完整、remove 级联
 
-P2.3 之后还有：
+P2.4 落地清单：
 
-- P2.4 CLI：`ndl library list/show/remove`
-- 已锁定方向：
-  - download 默认自动入库，提供 `--no-save` 退出口（P2.4 落地）
-  - DB 路径 `~/.ndl/library.db`（与免责声明 marker 同位置，复用 `NDL_HOME`）
+1. `ndl library list` — 表格输出 `id / title / author / status / chapter_count / fetched_at`
+2. `ndl library show <id>` — 显示头部信息 + 章节列表（不展开正文）
+3. `ndl library remove <id>` — 级联删除，需要 `--yes` 跳过确认
+4. `ndl download` 默认在写完文件后调用 `library_service().save(novel)`，通过 `--no-save` 退出
+5. `CliRunner` 测试用 `NDL_HOME=tmp_path/.ndl` 隔离 DB
+
+注意：P2.3 把 export 方法刻意从 LibraryService 拿掉；CLI 直接 `library.get(id)` + `convert_service.convert(novel, output)` 组合即可。
 
 建议 P2 退出条件：
 
