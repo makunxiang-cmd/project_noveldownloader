@@ -1,0 +1,357 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-muted: #eef2f4;
+  --line: #d8dee5;
+  --text: #1d252d;
+  --muted: #637282;
+  --accent: #0f766e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+.app-header {
+  display: flex;
+  min-height: 96px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  padding: 24px clamp(20px, 4vw, 56px);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.version {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.text-link {
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
+.app-main {
+  width: min(1120px, calc(100vw - 32px));
+  margin: 28px auto;
+}
+
+.subnav {
+  margin-bottom: 14px;
+}
+
+.toolbar,
+.library-panel,
+.detail-header,
+.metadata-grid,
+.error-panel,
+.download-panel,
+.job-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 80px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+}
+
+.download-panel {
+  margin-bottom: 16px;
+  padding: 18px 20px;
+}
+
+.download-form {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 160px auto auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.download-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.download-form input[type="url"],
+.download-form select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  padding: 8px 10px;
+}
+
+.download-form button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-height: 38px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 20px;
+}
+
+.status-pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.metadata-grid div {
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  padding: 14px 16px;
+}
+
+.metadata-grid div:nth-child(3n),
+.metadata-grid .wide {
+  border-right: 0;
+}
+
+.metadata-grid div:nth-last-child(-n + 3) {
+  border-bottom: 0;
+}
+
+.metadata-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.metadata-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.metadata-grid strong {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.library-panel {
+  overflow-x: auto;
+}
+
+.library-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.library-table th,
+.library-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 13px 16px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.library-table th {
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.library-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.numeric {
+  text-align: right;
+}
+
+.empty-state {
+  display: grid;
+  min-height: 240px;
+  place-content: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.empty-state p {
+  color: var(--muted);
+}
+
+.error-panel {
+  padding: 24px;
+}
+
+.job-panel {
+  padding: 24px;
+}
+
+.job-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 18px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.job-details div {
+  padding: 14px 16px;
+  border-right: 1px solid var(--line);
+}
+
+.job-details div:last-child {
+  border-right: 0;
+}
+
+.job-details dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.job-details dd {
+  margin: 4px 0 0;
+  font-weight: 650;
+}
+
+.progress-log {
+  margin: 0 0 18px;
+  padding-left: 20px;
+}
+
+.error-panel pre {
+  margin: 14px 0 18px;
+  white-space: pre-wrap;
+  color: var(--muted);
+  font-family: inherit;
+}
+
+@media (max-width: 640px) {
+  .app-header,
+  .toolbar,
+  .detail-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .app-main {
+    width: min(100vw - 20px, 1120px);
+    margin-top: 18px;
+  }
+
+  .metadata-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metadata-grid div,
+  .metadata-grid div:nth-child(3n),
+  .metadata-grid div:nth-last-child(-n + 3) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .metadata-grid div:last-child {
+    border-bottom: 0;
+  }
+
+  .download-form,
+  .job-details {
+    grid-template-columns: 1fr;
+  }
+
+  .job-details div {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .job-details div:last-child {
+    border-bottom: 0;
+  }
+}

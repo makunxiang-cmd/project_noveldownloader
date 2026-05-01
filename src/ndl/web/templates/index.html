@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}NDL Library{% endblock %}
+
+{% block content %}
+  <section class="toolbar" aria-label="Library summary">
+    <div>
+      <p class="eyebrow">Local SQLite Library</p>
+      <h2>{{ summaries|length }} saved {{ "novel" if summaries|length == 1 else "novels" }}</h2>
+    </div>
+  </section>
+
+  <section class="download-panel" aria-label="Download novel">
+    <form class="download-form" action="/downloads" method="post">
+      <label>
+        URL
+        <input name="url" type="url" required placeholder="https://example-novels.test/book/123">
+      </label>
+      <label>
+        Format
+        <select name="format">
+          {% for format in download_formats %}
+            <option value="{{ format }}" {% if format == "epub" %}selected{% endif %}>{{ format }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="checkbox-row">
+        <input name="save" type="checkbox" checked>
+        Save
+      </label>
+      <button type="submit">Download</button>
+    </form>
+  </section>
+
+  <section class="library-panel" aria-label="Saved novels">
+    {% if summaries %}
+      <table class="library-table">
+        <thead>
+          <tr>
+            <th scope="col">ID</th>
+            <th scope="col">Title</th>
+            <th scope="col">Author</th>
+            <th scope="col">Status</th>
+            <th scope="col">Chapters</th>
+            <th scope="col">Fetched</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for novel in summaries %}
+            <tr>
+              <td class="numeric">{{ novel.id }}</td>
+              <td><a class="text-link" href="/library/{{ novel.id }}">{{ novel.title }}</a></td>
+              <td>{{ novel.author }}</td>
+              <td>{{ novel.status }}</td>
+              <td class="numeric">{{ novel.chapter_count }}</td>
+              <td>{{ novel.fetched_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state">
+        <h2>No saved novels</h2>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

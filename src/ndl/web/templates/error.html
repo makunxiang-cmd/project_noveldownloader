@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}{{ error_title }} - NDL{% endblock %}
+
+{% block content %}
+  <section class="error-panel" aria-label="Error">
+    <p class="eyebrow">Error</p>
+    <h2>{{ error_title }}</h2>
+    <pre>{{ error_message }}</pre>
+    <a class="text-link" href="/">Library</a>
+  </section>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}{{ novel.title }} - NDL Library{% endblock %}
+
+{% block content %}
+  <nav class="subnav" aria-label="Library navigation">
+    <a class="text-link" href="/">Library</a>
+  </nav>
+
+  <section class="detail-header" aria-label="Novel metadata">
+    <div>
+      <p class="eyebrow">Library ID {{ novel_id }}</p>
+      <h2>{{ novel.title }}</h2>
+    </div>
+    <span class="status-pill">{{ novel.status }}</span>
+  </section>
+
+  <section class="metadata-grid" aria-label="Novel details">
+    <div>
+      <span>Author</span>
+      <strong>{{ novel.author }}</strong>
+    </div>
+    <div>
+      <span>Source rule</span>
+      <strong>{{ novel.source_rule_id }}</strong>
+    </div>
+    <div>
+      <span>Fetched</span>
+      <strong>{{ novel.fetched_at.strftime("%Y-%m-%d %H:%M") }}</strong>
+    </div>
+    {% if novel.source_url %}
+      <div class="wide">
+        <span>Source URL</span>
+        <strong>{{ novel.source_url }}</strong>
+      </div>
+    {% endif %}
+    {% if novel.summary %}
+      <div class="wide">
+        <span>Summary</span>
+        <strong>{{ novel.summary }}</strong>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="library-panel" aria-label="Chapters">
+    <table class="library-table">
+      <thead>
+        <tr>
+          <th scope="col">Index</th>
+          <th scope="col">Title</th>
+          <th scope="col">Words</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for chapter in novel.chapters %}
+          <tr>
+            <td class="numeric">{{ chapter.index }}</td>
+            <td>{{ chapter.title }}</td>
+            <td class="numeric">{{ chapter.word_count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endblock %}

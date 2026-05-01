@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- P3.3 Web download flow: homepage download form, URL-encoded form handling without `python-multipart`, in-memory download job registry, native EventSource progress rendering, and `/downloads/{job_id}/events` SSE endpoint
+- P3.3 Web download tests: mocked HTTP web-triggered download persists to the temp library, no-save skips persistence, SSE emits progress/status events, and missing URL validation returns a user-visible error
+- P3.2 read-only Web library views: list rows link to `/library/{id}`, detail pages render novel metadata and chapter titles/word counts without bodies, and missing IDs render a 404 error template
+- P3.1 Web UI skeleton: `src/ndl/web/` FastAPI app factory, Jinja2 templates, static CSS, and TestClient coverage for the local library homepage
+- P3 runtime dependencies: `fastapi>=0.110`, `uvicorn[standard]>=0.27`, `jinja2>=3.1`, and `sse-starlette>=2.0`
+- P3 Web UI implementation plan (`docs/superpowers/plans/2026-05-01-ndl-p3-web-ui.md`) with approved dependency decisions and slices for app skeleton, read-only library views, download progress, `ndl serve`, and docs polish
 - P2.4 library CLI: `ndl library list`, `ndl library show <id>`, and `ndl library remove <id> --yes`; list/show render Rich tables and `show` omits chapter bodies
 - P2.4 CLI persistence coverage: `CliRunner` tests now isolate `library.db` with `NDL_HOME`, verify download auto-save, verify `--no-save`, and cover show/remove lifecycle
 - P2.3 `LibraryService` (`src/ndl/application/services/library.py`): thin domain-facing wrapper over `LibraryRepository` with `save`/`list`/`get`/`remove`; `ServiceContainer` exposes a singleton `library_service()` that lazily provisions a SQLite engine + sessionmaker on first use
