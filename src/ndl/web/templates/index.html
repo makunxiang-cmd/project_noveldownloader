@@ -8,6 +8,9 @@
       <p class="eyebrow">Local SQLite Library</p>
       <h2>{{ summaries|length }} saved {{ "novel" if summaries|length == 1 else "novels" }}</h2>
     </div>
+    <form class="toolbar-form" action="/updates" method="post">
+      <button type="submit">Update all</button>
+    </form>
   </section>
 
   <section class="download-panel" aria-label="Download novel">

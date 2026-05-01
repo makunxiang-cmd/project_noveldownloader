@@ -9,7 +9,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from ndl.application.paths import library_db_path
-from ndl.application.services import ConvertService, DownloadService, LibraryService
+from ndl.application.services import ConvertService, DownloadService, LibraryService, UpdateService
 from ndl.converters import WriterRegistry, default_writer_registry
 from ndl.core.models import Novel
 from ndl.core.progress import ProgressCallback
@@ -95,6 +95,16 @@ class ServiceContainer:
         if self._library is None:
             self._library = LibraryService(LibraryRepository(self._ensure_sessions()))
         return self._library
+
+    def update_service(self, *, progress: ProgressCallback | None = None) -> UpdateService:
+        """Build an UpdateService with configured rules and fetcher/parser factories."""
+        return UpdateService(
+            library=self.library_service(),
+            rule_for=self.rule_for,
+            fetcher_factory=self.fetcher_for,
+            parser_factory=self.parser_for,
+            progress=progress,
+        )
 
     def _ensure_sessions(self) -> sessionmaker[Session]:
         if self._sessions is None:

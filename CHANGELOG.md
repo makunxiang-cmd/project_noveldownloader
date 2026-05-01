@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- P4.3 Web update controls: homepage `Update all` action, `/updates` result page, and Web tests covering append-only update results plus empty-library status
+- P4.2 scheduled update runs under `ndl serve`: APScheduler-backed `UpdateScheduler`, FastAPI lifespan startup/shutdown wiring, and `--scheduler/--no-scheduler` plus `--update-interval-hours` serve options
+- P4.1 manual update flow: `UpdateService.update_all()`, repository append support for newly discovered chapters, and `ndl update --all` for refreshing saved non-completed novels without refetching stored chapter bodies
+- P4 update scheduling plan (`docs/superpowers/plans/2026-05-01-ndl-p4-update-scheduling.md`) splitting manual update logic, APScheduler integration, and Web-triggered update status
 - P3.5 Web UI polish: empty-state hint pointing at the download form, and a result block on the download job page that renders the final output path and a link back to the saved library entry once the SSE stream emits the terminal status event
 - P3.5 documentation pass: `docs/user-guide/README.md` now documents the library and serve commands, web download flow, disclaimer marker, and the `<NDL_HOME>/{library.db,disclaimer.accepted,downloads/}` state layout; `docs/index.md` and `README.zh-CN.md` reflect P2/P3 progress
 - P3.4 `ndl serve` CLI with `--host`, `--port`, `--reload`, `--accept-disclaimer`, and `--allow-public-host`; defaults to localhost and refuses public binds unless explicitly allowed

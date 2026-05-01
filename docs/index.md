@@ -2,7 +2,7 @@
 
 Welcome to the NDL documentation.
 
-**Status:** Under active development. P0 scaffold, P1 MVP download/convert, P2 library persistence, and the P3 local Web UI core flow are implemented; P3.5 docs polish is in progress. Agent handoff state is tracked in `superpowers/SESSION-STATE.md`.
+**Status:** Under active development. P0 scaffold, P1 MVP download/convert, P2 library persistence, P3 local Web UI, and P4 library updates are implemented; P5 search and remote rule management are next. Agent handoff state is tracked in `superpowers/SESSION-STATE.md`.
 
 ## Current Capabilities
 
@@ -10,12 +10,13 @@ Welcome to the NDL documentation.
 - `ndl convert book.txt -o book.epub` converts local TXT input to TXT or EPUB.
 - `ndl download <url> -o book.epub --accept-disclaimer` downloads a rule-matched static HTML source, writes TXT or EPUB, and saves to the local SQLite library by default (`--no-save` to skip).
 - `ndl library list/show/remove` inspects and prunes the local SQLite library.
-- `ndl serve --accept-disclaimer` starts the local FastAPI/Jinja2 Web UI on `127.0.0.1`.
+- `ndl update --all --accept-disclaimer` refreshes saved non-completed novels and appends newly discovered chapters.
+- `ndl serve --accept-disclaimer` starts the local FastAPI/Jinja2 Web UI on `127.0.0.1`, supports manual update-all, and runs recurring updates by default.
 - Downloads honor the bundled rule's robots.txt, rate-limit, retry, and encoding policies.
 
 ## Next Milestone
 
-P3.5 finishes Web UI polish and documentation; P4 adds the update scheduler (`ndl update --all`). See the active plan under `superpowers/plans/2026-05-01-ndl-p3-web-ui.md` and the handoff snapshot under `superpowers/SESSION-STATE.md`.
+P5 adds search and remote rule management. See the handoff snapshot under `superpowers/SESSION-STATE.md`.
 
 ## Sections
 

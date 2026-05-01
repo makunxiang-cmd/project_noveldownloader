@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, NoReturn
@@ -13,6 +14,7 @@ from rich.table import Table
 
 from ndl import __version__
 from ndl.application.container import ServiceContainer
+from ndl.application.services import UpdateResult
 from ndl.cli.disclaimer import ensure_download_disclaimer
 from ndl.cli.renderers import cli_progress
 from ndl.core.errors import InvalidArgumentError, NDLError, UserError
@@ -149,14 +151,68 @@ def serve(
             help="Allow binding the Web UI to a non-localhost interface.",
         ),
     ] = False,
+    scheduler: Annotated[
+        bool,
+        typer.Option(
+            "--scheduler/--no-scheduler",
+            help="Run recurring library updates while the Web UI is active.",
+        ),
+    ] = True,
+    update_interval_hours: Annotated[
+        int,
+        typer.Option(
+            "--update-interval-hours",
+            min=1,
+            help="Hours between recurring Web update checks.",
+        ),
+    ] = 6,
 ) -> None:
     """Serve the local Web UI."""
     try:
         ensure_download_disclaimer(accept=accept_disclaimer)
         _validate_serve_host(host, allow_public_host=allow_public_host)
-        _run_web_server(host=host, port=port, reload=reload)
+        _run_web_server(
+            host=host,
+            port=port,
+            reload=reload,
+            scheduler=scheduler,
+            update_interval_hours=update_interval_hours,
+        )
     except NDLError as exc:
         _raise_cli_error(exc)
+
+
+@app.command("update")
+def update_command(
+    all_entries: Annotated[
+        bool,
+        typer.Option("--all", help="Update all saved non-completed novels."),
+    ] = False,
+    accept_disclaimer: Annotated[
+        bool,
+        typer.Option(
+            "--accept-disclaimer",
+            help="Accept the lawful-use download disclaimer for this machine.",
+        ),
+    ] = False,
+) -> None:
+    """Check saved novels for newly published chapters."""
+    try:
+        if not all_entries:
+            raise InvalidArgumentError(
+                "Choose an update scope.",
+                detail="Use `ndl update --all` to update every eligible library entry.",
+            )
+        ensure_download_disclaimer(accept=accept_disclaimer)
+        results = asyncio.run(_update_all())
+    except NDLError as exc:
+        _raise_cli_error(exc)
+    if not results:
+        typer.echo("No updatable library entries.")
+        return
+    _console().print(_update_table(results))
+    if any(result.status == "failed" for result in results):
+        raise typer.Exit(1)
 
 
 @library_app.command("list")
@@ -258,6 +314,12 @@ async def _convert(input_path: Path, output_path: Path, *, target_format: str | 
         )
 
 
+async def _update_all() -> list[UpdateResult]:
+    container = ServiceContainer()
+    async with cli_progress() as progress:
+        return await container.update_service(progress=progress).update_all()
+
+
 def _raise_cli_error(exc: NDLError) -> NoReturn:
     typer.echo(exc.user_message(), err=True)
     raise typer.Exit(exc.exit_code)
@@ -281,11 +343,20 @@ def _is_local_bind(host: str) -> bool:
     return normalized in {"127.0.0.1", "localhost", "::1", "[::1]"}
 
 
-def _run_web_server(*, host: str, port: int, reload: bool) -> None:
+def _run_web_server(
+    *,
+    host: str,
+    port: int,
+    reload: bool,
+    scheduler: bool,
+    update_interval_hours: int,
+) -> None:
     import uvicorn
 
+    os.environ["NDL_WEB_ENABLE_SCHEDULER"] = "1" if scheduler else "0"
+    os.environ["NDL_WEB_UPDATE_INTERVAL_HOURS"] = str(update_interval_hours)
     uvicorn.run(
-        "ndl.web.app:create_app",
+        "ndl.web.app:create_serve_app",
         factory=True,
         host=host,
         port=port,
@@ -321,6 +392,26 @@ def _library_table(summaries: list[NovelSummary]) -> Table:
             summary.status,
             str(summary.chapter_count),
             _format_datetime(summary.fetched_at),
+        )
+    return table
+
+
+def _update_table(results: list[UpdateResult]) -> Table:
+    table = Table()
+    table.add_column("id", justify="right")
+    table.add_column("title")
+    table.add_column("status")
+    table.add_column("new", justify="right")
+    table.add_column("total", justify="right")
+    table.add_column("message")
+    for result in results:
+        table.add_row(
+            str(result.novel_id),
+            result.title,
+            result.status,
+            str(result.new_chapter_count),
+            str(result.total_chapter_count),
+            result.message or "",
         )
     return table
 

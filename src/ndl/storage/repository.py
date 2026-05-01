@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -78,6 +79,33 @@ class LibraryRepository:
                 return False
             session.delete(row)
             return True
+
+    def append_chapters(
+        self,
+        novel_id: int,
+        chapters: Sequence[Chapter],
+        *,
+        updated_at: datetime,
+        status: NovelStatus | None = None,
+    ) -> int:
+        """Append chapters with new indices and return the number inserted."""
+        stmt = (
+            select(NovelRow).where(NovelRow.id == novel_id).options(selectinload(NovelRow.chapters))
+        )
+        with self._sessions() as session, session.begin():
+            row = session.execute(stmt).scalar_one_or_none()
+            if row is None:
+                return 0
+            existing_indices = {chapter.index for chapter in row.chapters}
+            new_chapters = [
+                chapter for chapter in chapters if chapter.index not in existing_indices
+            ]
+            row.chapters.extend(_chapter_to_row(chapter, updated_at) for chapter in new_chapters)
+            if status is not None:
+                row.status = status
+            if new_chapters:
+                row.last_updated = updated_at
+            return len(new_chapters)
 
     @staticmethod
     def _find_existing(session: Session, novel: Novel) -> NovelRow | None:

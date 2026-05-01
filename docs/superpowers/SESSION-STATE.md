@@ -2,7 +2,7 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
 >
-> 最后更新：2026-05-01（P3.5 Web Polish + Docs 完成：`docs/user-guide/README.md` 重写覆盖 library/serve/--no-save/NDL_HOME 状态布局；`docs/index.md` 与 `README.zh-CN.md` 同步 P2/P3 状态；Web UI 增加首页空态提示与下载任务结果块（输出路径 + 书库链接），无新增依赖；CHANGELOG/P3 plan 标注切片完成。下一步进入 P4 调度/更新）
+> 最后更新：2026-05-01（P4.3 Web Update Trigger + Status 完成：首页新增 `Update all` 表单，`POST /updates` 调用 `UpdateService.update_all()` 并渲染每本书结果表；P4 plan 标记完成；新增 P5 Search and Remote Rules 计划。下一步进入 P5.1 Search domain + service）
 
 ---
 
@@ -34,6 +34,9 @@
 | **P3.3 Download Form + Progress Channel** | 首页下载表单；`POST /downloads` URL-encoded 表单解析（不加 `python-multipart`）；FastAPI background task 复用下载/转换服务；输出默认写到 `NDL_HOME/downloads`；`JobRegistry` 记录进度并通过 SSE 输出；native EventSource 渲染进度 | 见 P3 plan §P3.3 |
 | **P3.4 `ndl serve` CLI** | `ndl serve` 启动本地 FastAPI Web UI；支持 `--host` / `--port` / `--reload` / `--accept-disclaimer` / `--allow-public-host`；默认 localhost，公共 bind 需显式确认；CliRunner 测试不启动真实 server | 见 P3 plan §P3.4 |
 | **P3.5 Web Polish + Docs** | `docs/user-guide/README.md` 重写覆盖 library/serve/--no-save 与 `<NDL_HOME>/{library.db,disclaimer.accepted,downloads/}` 状态布局；`docs/index.md`、`README.zh-CN.md` 同步 P2/P3 状态；Web UI 加首页空态提示和下载任务结果块（输出路径 + 书库链接） | 见 P3 plan §P3.5 |
+| **P4.1 Manual Update** | `UpdateService` 按书库条目重新抓目录、比较已存章节 index、只抓缺失章节并追加入库；`ndl update --all` 复用免责声明 gate 和 CLI progress；无新增依赖 | 见 P4 plan §P4.1 |
+| **P4.2 Scheduled Runs** | `UpdateScheduler` 使用 APScheduler interval job 调用同一个 `UpdateService.update_all()`；`ndl serve` 默认启用定时追更并可通过 `--no-scheduler` / `--update-interval-hours` 调整；TestClient 默认不启动调度 | 见 P4 plan §P4.2 |
+| **P4.3 Web Update Trigger + Status** | Web 首页 `Update all` 入口；`/updates` 结果页展示 id/title/status/new/total/message；TestClient + mocked HTTP 覆盖 append-only 更新与空库状态 | 见 P4 plan §P4.3 |
 
 ### 当前活动 Plan
 
@@ -53,7 +56,7 @@
 - P2.3 ✅ implemented — LibraryService + ServiceContainer.library_service()
 - P2.4 ✅ implemented — `ndl library list/show/remove` CLI + download 默认入库 + `--no-save` 退出口
 
-当前活动计划：**`docs/superpowers/plans/2026-05-01-ndl-p3-web-ui.md`** —— P3 Web UI 计划：
+已完成计划：**`docs/superpowers/plans/2026-05-01-ndl-p3-web-ui.md`** —— P3 Web UI 计划：
 
 - P3.1 ✅ implemented — Web App Skeleton（依赖 + `src/ndl/web/` app factory/templates/static + `GET /` 测试）
 - P3.2 ✅ implemented — Read-only Library Views
@@ -61,14 +64,58 @@
 - P3.4 ✅ implemented — `ndl serve` CLI
 - P3.5 ✅ implemented — Web Polish + Docs
 
+已完成计划：**`docs/superpowers/plans/2026-05-01-ndl-p4-update-scheduling.md`** —— P4 Update Scheduling 计划：
+
+- P4.1 ✅ implemented — Manual Update Service + CLI（`ndl update --all`）
+- P4.2 ✅ implemented — Scheduled Runs Under `ndl serve`（APScheduler）
+- P4.3 ✅ implemented — Web Update Trigger + Status
+
+当前活动计划：**`docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md`** —— P5 Search and Remote Rules 计划：
+
+- P5.1 ⏳ planned — Search Domain + Service
+- P5.2 ⏳ planned — `ndl search`
+- P5.3 ⏳ planned — Remote Rule Update
+- P5.4 ⏳ planned — Web Search Surface
+
 ### 质量门当前状态
 
 ```
 ruff check / format     ✅
-mypy --strict (45 文件) ✅
-pytest                  ✅ 112 passed
-coverage                ✅ 90.40%（fail_under=80）
+mypy --strict (48 文件) ✅
+pytest                  ✅ 123 passed
+coverage                ✅ 89.40%（fail_under=80）
 ```
+
+### 本轮（2026-05-01）P4.1 完成要点
+
+- 新增 `docs/superpowers/plans/2026-05-01-ndl-p4-update-scheduling.md`，把 P4 拆为手动 update service/CLI、APScheduler 接入、Web 手动触发与状态展示
+- `src/ndl/application/services/update.py` 新增 `UpdateService` 与 `UpdateResult`；`update_all()` 遍历书库中非 completed 且有 `source_url` 的条目，单本失败会记录为 result，不中断整批
+- `UpdateService.update_novel()` 重新抓取目录页，对比已存章节 index，只 fetch 缺失章节，再通过 `LibraryService.append_chapters()` 追加入库
+- `src/ndl/storage/repository.py` 新增 `append_chapters()`，在单事务内过滤重复 index、追加章节、更新 `last_updated` 与最新状态
+- `ServiceContainer.update_service()` 接好规则解析、fetcher/parser factory 与 progress callback
+- CLI 新增 `ndl update --all --accept-disclaimer`；未给 `--all` 时返回用户错误；输出 Rich 表格（id/title/status/new/total/message）
+- 测试新增 `tests/unit/application/services/test_update.py` 与 CLI mocked HTTP 覆盖，确保只抓缺失章节、跳过 completed/无 source_url 条目
+- README、README.zh-CN、docs/user-guide、docs/index、docs/developer、CHANGELOG 已同步 P4.1 状态
+
+### 本轮（2026-05-01）P4.2 完成要点
+
+- 新增依赖 `apscheduler>=3.10`（当前 lock 为 3.11.2，附带 `tzlocal`）
+- 新增 `src/ndl/scheduler/update_job.py`：`UpdateScheduler` 封装 APScheduler `AsyncIOScheduler`，注册 interval job `ndl-update-all`，`max_instances=1`、`coalesce=True`，并记录 `UpdateSchedulerState`
+- `UpdateScheduler.run_once()` 调用注入的 `update_all` coroutine；Web 侧注入的是 `service_container.update_service().update_all`，保证 CLI 与调度器复用同一业务入口
+- `src/ndl/web/app.py` 增加 lifespan；`create_app()` 默认 `enable_scheduler=False`，测试和直接 app factory 不启动后台调度；`create_serve_app()` 从环境读取调度开关与间隔
+- `ndl serve` 增加 `--scheduler/--no-scheduler` 与 `--update-interval-hours`，并把 uvicorn factory 目标改为 `ndl.web.app:create_serve_app`
+- 新增 scheduler 单元测试覆盖 start/shutdown、interval job 参数、run_once 成功与用户错误记录；Web 测试覆盖默认关闭与显式启用时 lifespan 启停；CLI 测试覆盖新 serve 参数和环境传递
+- README、README.zh-CN、docs/user-guide、docs/index、docs/developer、CHANGELOG、P4 plan 已同步 P4.2 状态
+
+### 本轮（2026-05-01）P4.3 完成要点
+
+- Web 首页 toolbar 新增 `Update all` 表单，提交到 `POST /updates`
+- `src/ndl/web/app.py` 新增 `/updates` 路由，调用 `service_container.update_service().update_all()`；NDLError 转为用户安全错误页
+- 新增 `src/ndl/web/templates/update_results.html`，展示每本书 `id/title/status/new/total/message`，标题链接回书籍详情
+- CSS 增加 `.update-panel` / `.panel-heading` / toolbar button 样式，沿用现有本地工具界面风格
+- Web 测试新增 mocked HTTP 追更路径：已保存 1 章时只抓第 2 章并追加；空库更新渲染空状态
+- 新增 `docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md`，P4 完成后下一步进入 P5.1 Search domain + service
+- README、README.zh-CN、docs/user-guide、docs/index、docs/developer、CHANGELOG、P4 plan、本文件已同步 P4.3 状态
 
 ### 本轮（2026-05-01）P3.5 完成要点
 
@@ -182,7 +229,7 @@ uv run pre-commit run --all-files
 
 ```
 1. Read docs/superpowers/SESSION-STATE.md（本文件）
-2. Read docs/superpowers/plans/2026-05-01-ndl-p3-web-ui.md（活动 plan）
+2. Read docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md（活动 plan）
 3. Read AGENTS.md + docs/agents/issue-tracker.md（约定）
 4. 检查仓库状态：git log --oneline -10 + git status，确认是否存在未提交切片变更
 5. 确认本文件 §1 的"已完成"列表与代码实际情况一致：
@@ -191,12 +238,13 @@ uv run pre-commit run --all-files
    - src/ndl/parsers/     ✅ P1.2 + P1.4 TXT reader
    - src/ndl/fetchers/    ✅ P1.3
    - src/ndl/converters/  ✅ P1.4
-   - src/ndl/application/ ✅ P1.5
-   - src/ndl/cli/         ✅ P1.6 + P2.4 library commands + P3.4 serve
-   - src/ndl/storage/     ✅ P2.1-P2.2
-   - src/ndl/web/         ✅ P3.1-P3.5
+   - src/ndl/application/ ✅ P1.5 + P2.3 library + P4.1 update service
+   - src/ndl/scheduler/   ✅ P4.2 APScheduler wrapper
+   - src/ndl/cli/         ✅ P1.6 + P2.4 library commands + P3.4 serve + P4.1 update + P4.2 scheduler flags
+   - src/ndl/storage/     ✅ P2.1-P2.2 + P4.1 append_chapters
+   - src/ndl/web/         ✅ P3.1-P3.5 + P4.3 update controls
 6. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
-7. P3 全部已完成；下一步进入 P4 调度/更新（`ndl update --all`）
+7. P4 全部已完成；下一步进入 P5.1 Search domain + service
 8. 完成新切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
 ```
 
@@ -213,13 +261,14 @@ uv run pre-commit run --all-files
 
 ---
 
-## 3. 下一步（P3.5 Web Polish + Docs）的预备信息
+## 3. 下一步（P5.1 Search Domain + Service）的预备信息
 
-P2 书库持久化已经完成，P3.1-P3.4 Web UI 主功能与启动命令已完成。接手 agent 应按 `docs/superpowers/plans/2026-05-01-ndl-p3-web-ui.md` 实施 P3.5。设计路线图把 P3 定义为 `web` / Jinja2 + HTMX + SSE / `ndl serve`：
+P4 已经完成追更核心、CLI、定时调度和 Web 手动入口。接手 agent 应按 `docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md` 实施 P5.1。
 
-- P3 plan 已批准依赖：`fastapi>=0.110`, `uvicorn[standard]>=0.27`, `jinja2>=3.1`, `sse-starlette>=2.0`
-- 复用现有服务：`ServiceContainer.download()` / `convert_service()` / `library_service()`
-- 复用持久化：默认库路径 `~/.ndl/library.db`，测试可通过 `NDL_HOME` 隔离
+- P5.1 应先定义搜索结果领域模型和服务层，不急着做 CLI/Web
+- 搜索能力必须由规则声明驱动；如需扩展 rule schema，保持向后兼容并补 fixtures
+- 测试继续使用 bundled fixture 或 mocked HTTP，不接真实网络
+- 不要把商业平台、登录、验证码、Cloudflare 或 paywall 绕过放入搜索范围
 - 合规边界继续沿用：免责声明、robots.txt、限速/并发约束不可绕过
 
 P3.1 已落地清单：
@@ -254,13 +303,13 @@ P3.4 落地清单：
 4. 通过 `uvicorn` 启动 `ndl.web:create_app` 或等价 app factory
 5. CliRunner 测试覆盖免责声明 gate 和参数校验，不启动真实 server
 
-P3.5 下一步清单：
+P3.5 已落地清单：
 
 1. 补齐 focused CSS，让 Web UI 保持本地工具风格：紧凑、可扫读、下载/书库区域清晰
 2. 更新 README 与 docs/user-guide 中的当前 CLI + Web 命令，反映 P2/P3 已落地能力
 3. 文档说明状态存储位置：`NDL_HOME`、`library.db`、免责声明 marker、Web 下载输出目录
-4. 保持无 Node/npm、无前端构建链；除非先更新 P3 plan，否则不新增依赖
-5. 跑完整质量门并更新 CHANGELOG、P3 plan、本文件
+4. 保持无 Node/npm、无前端构建链；P3.5 未新增依赖
+5. 已跑完整质量门并更新 CHANGELOG、P3 plan、本文件
 
 P2.4 已落地清单：
 
@@ -294,11 +343,11 @@ P2 退出条件已满足：
 - ✅ 包管理 / 构建：`uv` + `hatchling`
 - ✅ 质量工具：`ruff` + `mypy --strict` + `pytest` + `pre-commit`
 
-尚未落地（P2 之后）：
+阶段化落地状态（P2 之后）：
 
 - ✅ 存储：SQLite + SQLAlchemy 2.0 Mapped style + WAL（P2.1 已落地，仓储/服务/CLI 在 P2.2–P2.4）
-- ⏳ Web：FastAPI + Jinja2 + SSE 已落地到 P3.4；P3.5 docs/polish 待完成；HTMX 尚未使用
-- ⏳ 调度：APScheduler AsyncIO（P4 阶段）
+- ✅ Web：FastAPI + Jinja2 + SSE 已落地到 P3.5；HTMX 尚未使用
+- ✅ 调度：APScheduler AsyncIO（P4.2 已落地于 `src/ndl/scheduler/`）
 - ⏳ Playwright extras（P2+，按需）
 - ⏳ 日志：`structlog`（P5 阶段）
 - ⏳ i18n：`babel`（P5+）

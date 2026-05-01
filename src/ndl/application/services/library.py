@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from ndl.core.models import Novel
+from collections.abc import Sequence
+from datetime import datetime
+
+from ndl.core.models import Chapter, Novel, NovelStatus
 from ndl.storage.repository import LibraryRepository, NovelSummary
 
 
@@ -27,3 +30,19 @@ class LibraryService:
     def remove(self, novel_id: int) -> bool:
         """Delete the novel and its chapters; return True if a row was removed."""
         return self._repository.remove(novel_id)
+
+    def append_chapters(
+        self,
+        novel_id: int,
+        chapters: Sequence[Chapter],
+        *,
+        updated_at: datetime,
+        status: NovelStatus | None = None,
+    ) -> int:
+        """Append new chapters to a saved novel."""
+        return self._repository.append_chapters(
+            novel_id,
+            chapters,
+            updated_at=updated_at,
+            status=status,
+        )

@@ -10,7 +10,7 @@
 
 ## 项目状态
 
-开发中。P0 脚手架、P1 MVP 下载/转换、P2 书库持久化、P3 本地 Web UI 主要功能均已实现，正在补齐 P3 的文档与界面打磨。首发版本 v0.1 目标：下载、TXT/EPUB 转换、书库管理与本地 Web UI。当前接手快照见 `docs/superpowers/SESSION-STATE.md`。
+开发中。P0 脚手架、P1 MVP 下载/转换、P2 书库持久化、P3 本地 Web UI 与 P4 追更均已实现，下一步是 P5 搜索与远程规则管理。首发版本 v0.1 目标：下载、TXT/EPUB 转换、书库管理与本地 Web UI。当前接手快照见 `docs/superpowers/SESSION-STATE.md`。
 
 ## 当前可用
 
@@ -18,6 +18,8 @@
 - 将匹配内置规则的静态 HTML fixture 站点下载为 TXT 或 EPUB
 - 将本地 TXT 转换为 TXT 或 EPUB
 - 通过 `ndl library list/show/remove` 管理本地 SQLite 书库
+- 通过 `ndl update --all` 刷新已保存的连载小说
+- 在本地 Web UI 中手动刷新书库，`ndl serve` 运行时也可按间隔自动刷新
 - 通过 `ndl serve` 启动本地 Web UI（默认绑定 `127.0.0.1`）
 - 下载时强制 robots.txt、域名限速、重试策略与首跑合法使用免责声明
 
@@ -53,14 +55,9 @@ uv run ndl --version
 ndl download <url> -o book.epub --accept-disclaimer
 ndl convert book.txt -o book.epub
 ndl library list
+ndl update --all --accept-disclaimer
 ndl serve --accept-disclaimer
 ndl rules validate my-rule.yaml
-```
-
-P4+ 规划：
-
-```bash
-ndl update --all
 ```
 
 ## 贡献

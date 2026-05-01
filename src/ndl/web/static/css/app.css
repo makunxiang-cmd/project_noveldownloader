@@ -7,6 +7,7 @@
   --text: #1d252d;
   --muted: #637282;
   --accent: #0f766e;
+  --accent-dark: #115e59;
 }
 
 * {
@@ -87,6 +88,7 @@ h2 {
 .metadata-grid,
 .error-panel,
 .download-panel,
+.update-panel,
 .job-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -135,6 +137,7 @@ h2 {
   padding: 8px 10px;
 }
 
+.toolbar-form button,
 .download-form button {
   min-height: 38px;
   border: 0;
@@ -145,6 +148,11 @@ h2 {
   font: inherit;
   font-weight: 700;
   padding: 8px 14px;
+}
+
+.toolbar-form button:hover,
+.download-form button:hover {
+  background: var(--accent-dark);
 }
 
 .checkbox-row {
@@ -266,6 +274,19 @@ h2 {
   padding: 24px;
 }
 
+.update-panel {
+  overflow-x: auto;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 18px 20px;
+}
+
 .job-panel {
   padding: 24px;
 }
@@ -331,7 +352,8 @@ h2 {
 @media (max-width: 640px) {
   .app-header,
   .toolbar,
-  .detail-header {
+  .detail-header,
+  .panel-heading {
     align-items: flex-start;
     flex-direction: column;
   }

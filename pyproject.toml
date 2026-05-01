@@ -32,6 +32,7 @@ dependencies = [
   "uvicorn[standard]>=0.27",
   "jinja2>=3.1",
   "sse-starlette>=2.0",
+  "apscheduler>=3.10",
 ]
 
 [project.optional-dependencies]
@@ -112,7 +113,7 @@ show_error_codes = true
 files = ["src/ndl"]
 
 [[tool.mypy.overrides]]
-module = ["ebooklib"]
+module = ["apscheduler.*", "ebooklib"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -52,6 +52,17 @@ uv run ndl library remove <id> --yes
 counts only — chapter bodies are intentionally not printed. `remove` cascades
 to chapters and prompts for confirmation unless `--yes` is supplied.
 
+### Update saved ongoing novels
+
+```bash
+uv run ndl update --all --accept-disclaimer
+```
+
+`update --all` checks every saved non-completed library entry that has a source
+URL, reloads the index page, fetches only chapters whose indices are not already
+stored, and appends them to the SQLite library. Completed novels and local-only
+entries are skipped.
+
 ### Run the local Web UI
 
 ```bash
@@ -64,6 +75,9 @@ Useful flags:
 - `--host` and `--port` choose the bind address and port (defaults
   `127.0.0.1:8000`).
 - `--reload` runs uvicorn with autoreload for development.
+- `--scheduler/--no-scheduler` controls recurring library updates while the
+  Web UI is active. The scheduler is on by default for `ndl serve`.
+- `--update-interval-hours` sets the recurring update interval (default 6).
 - `--allow-public-host` is **required** before binding to anything other than
   `127.0.0.1` / `localhost` — `ndl serve` refuses public binds otherwise to
   avoid silently exposing downloads on a network interface.
@@ -74,6 +88,8 @@ The Web UI shares the same SQLite library and disclaimer marker as the CLI:
 
 - The homepage lists saved novels and exposes a download form (URL, format,
   Save toggle).
+- The homepage also exposes `Update all`, which checks saved ongoing novels and
+  renders a per-novel result table.
 - Submitting the form runs the existing download/convert services in a
   background task; the page subscribes to a Server-Sent Events stream and
   shows progress and final status without polling.
@@ -108,7 +124,6 @@ Tests redirect this with `NDL_HOME=/tmp/ndl-home` to keep CI hermetic.
 
 ## What Is Not Implemented Yet
 
-- Incremental updates: `ndl update --all` (P4 roadmap)
 - Browser-backed fetching for JS-rendered sources (P6 roadmap)
 - Search across multiple sites: `ndl search` (P5 roadmap)
 

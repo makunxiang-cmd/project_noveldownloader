@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -14,9 +17,11 @@ from sse_starlette.sse import EventSourceResponse
 from ndl import __version__
 from ndl.application.container import ServiceContainer
 from ndl.application.paths import ndl_home
+from ndl.application.services import UpdateResult
 from ndl.core.errors import NDLError, UserError
 from ndl.core.models import Novel
 from ndl.core.progress import ProgressEvent
+from ndl.scheduler import UpdateScheduler
 from ndl.web.jobs import DownloadJob, JobRegistry
 
 _WEB_DIR = Path(__file__).parent
@@ -29,15 +34,43 @@ def create_app(
     *,
     container: ServiceContainer | None = None,
     output_dir: Path | None = None,
+    enable_scheduler: bool = False,
+    scheduler_interval_hours: int = 6,
 ) -> FastAPI:
     """Create the local Web UI app."""
     service_container = container or ServiceContainer()
     download_output_dir = output_dir or (ndl_home() / "downloads")
     job_registry = JobRegistry()
     templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
-    app = FastAPI(title="NDL", version=__version__, docs_url=None, redoc_url=None)
+    update_scheduler = (
+        UpdateScheduler(
+            update_all=service_container.update_service().update_all,
+            interval_hours=scheduler_interval_hours,
+        )
+        if enable_scheduler
+        else None
+    )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        if update_scheduler is not None:
+            update_scheduler.start()
+        try:
+            yield
+        finally:
+            if update_scheduler is not None:
+                update_scheduler.shutdown()
+
+    app = FastAPI(
+        title="NDL",
+        version=__version__,
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
     app.state.container = service_container
     app.state.job_registry = job_registry
+    app.state.update_scheduler = update_scheduler
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
     @app.get("/", response_class=HTMLResponse)
@@ -50,6 +83,27 @@ def create_app(
                 "app_version": __version__,
                 "summaries": summaries,
                 "download_formats": sorted(_SUPPORTED_DOWNLOAD_FORMATS),
+            },
+        )
+
+    @app.post("/updates", response_class=HTMLResponse)
+    async def update_library(request: Request) -> Response:
+        try:
+            results = await service_container.update_service().update_all()
+        except NDLError as exc:
+            return _error_response(
+                templates,
+                request,
+                UserError("Update failed.", detail=exc.user_message()),
+                status_code=500,
+            )
+        return templates.TemplateResponse(
+            request,
+            "update_results.html",
+            {
+                "app_version": __version__,
+                "results": results,
+                "summary": _update_summary(results),
             },
         )
 
@@ -128,6 +182,14 @@ def create_app(
     return app
 
 
+def create_serve_app() -> FastAPI:
+    """Create the app used by `ndl serve`."""
+    return create_app(
+        enable_scheduler=_env_flag("NDL_WEB_ENABLE_SCHEDULER", default=False),
+        scheduler_interval_hours=_env_int("NDL_WEB_UPDATE_INTERVAL_HOURS", default=6),
+    )
+
+
 async def _run_download_job(
     *,
     job: DownloadJob,
@@ -170,6 +232,31 @@ def _slugify(value: str) -> str:
 def _parse_urlencoded(body: bytes) -> dict[str, str]:
     parsed = parse_qs(body.decode("utf-8"), keep_blank_values=True)
     return {key: values[-1] if values else "" for key, values in parsed.items()}
+
+
+def _update_summary(results: list[UpdateResult]) -> str:
+    if not results:
+        return "No updatable library entries."
+    updated = sum(result.new_chapter_count for result in results)
+    failed = sum(1 for result in results if result.status == "failed")
+    return f"{updated} new chapter(s), {failed} failed."
+
+
+def _env_flag(name: str, *, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, *, default: int) -> int:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return max(1, int(value))
+    except ValueError:
+        return default
 
 
 def _error_response(

@@ -2,7 +2,7 @@
 
 ## Current Status
 
-P0 through P3 are implemented. The project now has:
+P0 through P4 are implemented. The project now has:
 
 - Core domain models, protocols, progress events, and typed errors
 - YAML rule schema, selector DSL, loader, and resolver
@@ -11,13 +11,14 @@ P0 through P3 are implemented. The project now has:
 - TXT/EPUB writers and writer registry
 - SQLite-backed library persistence (`src/ndl/storage/`), with `LibraryRepository`
   and a `LibraryService` exposed through `ServiceContainer.library_service()`
-- Download/convert/library application services and a lightweight service container
+- Download/convert/library/update application services and a lightweight service container
 - Typer CLI commands: `download`, `convert`, `rules validate`,
-  `library list/show/remove`, and `serve`
+  `library list/show/remove`, `update --all`, and `serve`
 - Local FastAPI/Jinja2 Web UI under `src/ndl/web/`: homepage library list,
-  detail pages, download form, and an SSE progress channel
+  detail pages, download form, update-all controls, and an SSE progress channel
+- APScheduler-backed recurring update runs while `ndl serve` is active
 
-P4 is next: update scheduling (`ndl update --all`) backed by APScheduler.
+P5 is next: search and remote rule management.
 
 ## Development Workflow
 
@@ -42,7 +43,8 @@ All slices should keep these gates green.
 - `src/ndl/parsers/`: HTML parsers and TXT reader
 - `src/ndl/converters/`: TXT/EPUB writers and writer registry
 - `src/ndl/storage/`: SQLAlchemy 2.0 models, engine factory, sessionmaker, and `LibraryRepository`
-- `src/ndl/application/`: download/convert/library services and dependency wiring
+- `src/ndl/application/`: download/convert/library/update services and dependency wiring
+- `src/ndl/scheduler/`: APScheduler wrapper for recurring update jobs
 - `src/ndl/cli/`: Typer command surface and disclaimer gate
 - `src/ndl/web/`: FastAPI app factory, Jinja2 templates, hand-written CSS, native EventSource JS, and the in-memory job registry
 - `tests/unit/`: mirrors source package structure
@@ -62,7 +64,7 @@ All slices should keep these gates green.
 Before starting new work, read:
 
 1. `docs/superpowers/SESSION-STATE.md`
-2. The active plan named there (P2 and P3 plans are now both implemented; the next plan will land under `docs/superpowers/plans/` once P4 is scoped)
+2. The active plan named there (`docs/superpowers/plans/2026-05-01-ndl-p4-update-scheduling.md`)
 3. `AGENTS.md`
 
 `git log --oneline` is the authoritative record of completed work.

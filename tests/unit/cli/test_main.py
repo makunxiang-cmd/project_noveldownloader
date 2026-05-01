@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZipFile
@@ -13,7 +14,7 @@ from typer.testing import CliRunner
 
 from ndl import __version__
 from ndl.application.container import ServiceContainer
-from ndl.cli.main import app
+from ndl.cli.main import _run_web_server, app
 from ndl.core.models import Chapter, Novel
 
 runner = CliRunner()
@@ -97,10 +98,17 @@ def test_serve_requires_disclaimer_acceptance(tmp_path) -> None:
 def test_serve_runs_uvicorn_after_acceptance(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    calls: list[tuple[str, int, bool]] = []
+    calls: list[tuple[str, int, bool, bool, int]] = []
 
-    def _fake_run(*, host: str, port: int, reload: bool) -> None:
-        calls.append((host, port, reload))
+    def _fake_run(
+        *,
+        host: str,
+        port: int,
+        reload: bool,
+        scheduler: bool,
+        update_interval_hours: int,
+    ) -> None:
+        calls.append((host, port, reload, scheduler, update_interval_hours))
 
     monkeypatch.setattr("ndl.cli.main._run_web_server", _fake_run)
 
@@ -111,16 +119,43 @@ def test_serve_runs_uvicorn_after_acceptance(
     )
 
     assert result.exit_code == 0, result.output
-    assert calls == [("127.0.0.1", 8123, True)]
+    assert calls == [("127.0.0.1", 8123, True, True, 6)]
+
+
+def test_serve_can_disable_scheduler(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, int, bool, bool, int]] = []
+    monkeypatch.setattr(
+        "ndl.cli.main._run_web_server",
+        lambda *, host, port, reload, scheduler, update_interval_hours: calls.append(
+            (host, port, reload, scheduler, update_interval_hours)
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "serve",
+            "--accept-disclaimer",
+            "--no-scheduler",
+            "--update-interval-hours",
+            "12",
+        ],
+        env={"NDL_HOME": str(tmp_path / "ndl-home")},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [("127.0.0.1", 8000, False, False, 12)]
 
 
 def test_serve_rejects_public_host_without_explicit_allow(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    calls: list[tuple[str, int, bool]] = []
+    calls: list[tuple[str, int, bool, bool, int]] = []
     monkeypatch.setattr(
         "ndl.cli.main._run_web_server",
-        lambda *, host, port, reload: calls.append((host, port, reload)),
+        lambda *, host, port, reload, scheduler, update_interval_hours: calls.append(
+            (host, port, reload, scheduler, update_interval_hours)
+        ),
     )
 
     result = runner.invoke(
@@ -137,10 +172,12 @@ def test_serve_rejects_public_host_without_explicit_allow(
 def test_serve_allows_public_host_with_explicit_flag(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    calls: list[tuple[str, int, bool]] = []
+    calls: list[tuple[str, int, bool, bool, int]] = []
     monkeypatch.setattr(
         "ndl.cli.main._run_web_server",
-        lambda *, host, port, reload: calls.append((host, port, reload)),
+        lambda *, host, port, reload, scheduler, update_interval_hours: calls.append(
+            (host, port, reload, scheduler, update_interval_hours)
+        ),
     )
 
     result = runner.invoke(
@@ -150,7 +187,39 @@ def test_serve_allows_public_host_with_explicit_flag(
     )
 
     assert result.exit_code == 0, result.output
-    assert calls == [("0.0.0.0", 8000, False)]
+    assert calls == [("0.0.0.0", 8000, False, True, 6)]
+
+
+def test_run_web_server_uses_serve_factory_and_scheduler_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, bool, str, int, bool]] = []
+
+    def _fake_uvicorn_run(
+        app_target: str,
+        *,
+        factory: bool,
+        host: str,
+        port: int,
+        reload: bool,
+    ) -> None:
+        calls.append((app_target, factory, host, port, reload))
+
+    monkeypatch.setattr("uvicorn.run", _fake_uvicorn_run)
+    monkeypatch.delenv("NDL_WEB_ENABLE_SCHEDULER", raising=False)
+    monkeypatch.delenv("NDL_WEB_UPDATE_INTERVAL_HOURS", raising=False)
+
+    _run_web_server(
+        host="127.0.0.1",
+        port=8123,
+        reload=True,
+        scheduler=False,
+        update_interval_hours=12,
+    )
+
+    assert calls == [("ndl.web.app:create_serve_app", True, "127.0.0.1", 8123, True)]
+    assert os.environ["NDL_WEB_ENABLE_SCHEDULER"] == "0"
+    assert os.environ["NDL_WEB_UPDATE_INTERVAL_HOURS"] == "12"
 
 
 @pytest.fixture(autouse=True)
@@ -211,6 +280,31 @@ def test_download_no_save_skips_library(tmp_path) -> None:
     assert "No library entries." in list_result.output
 
 
+@respx.mock
+def test_update_all_appends_new_chapters_against_mocked_http(tmp_path: Path) -> None:
+    ndl_home = tmp_path / "ndl-home"
+    novel_id = _seed_updatable_library(ndl_home)
+    _mock_example_update()
+
+    result = runner.invoke(
+        app,
+        ["update", "--all", "--accept-disclaimer"],
+        env={"NDL_HOME": str(ndl_home)},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Example Public Domain Novel" in result.output
+    assert "updated" in result.output
+
+    show_result = runner.invoke(
+        app,
+        ["library", "show", str(novel_id)],
+        env={"NDL_HOME": str(ndl_home)},
+    )
+    assert show_result.exit_code == 0, show_result.output
+    assert "Chapter 2: Noon" in show_result.output
+
+
 def test_library_show_and_remove_commands(tmp_path) -> None:
     ndl_home = tmp_path / "ndl-home"
     novel_id = _seed_library(ndl_home)
@@ -259,6 +353,27 @@ def _mock_example_download() -> None:
     respx.get(f"{BASE_URL}/chapter/2").mock(return_value=httpx.Response(200, text=chapter_two))
 
 
+def _mock_example_update() -> None:
+    chapter_two = (
+        (FIXTURE_DIR / "chapter.html")
+        .read_text(encoding="utf-8")
+        .replace(
+            "Chapter 1: Dawn",
+            "Chapter 2: Noon",
+        )
+    )
+    respx.get("https://example-novels.test/robots.txt").mock(
+        return_value=httpx.Response(200, text="User-agent: *\nAllow: /\n")
+    )
+    respx.get(BASE_URL).mock(
+        return_value=httpx.Response(
+            200,
+            text=(FIXTURE_DIR / "index.html").read_text(encoding="utf-8"),
+        )
+    )
+    respx.get(f"{BASE_URL}/chapter/2").mock(return_value=httpx.Response(200, text=chapter_two))
+
+
 def _seed_library(ndl_home: Path) -> int:
     service = ServiceContainer(rules=[], db_path=ndl_home / "library.db").library_service()
     return service.save(
@@ -270,6 +385,28 @@ def _seed_library(ndl_home: Path) -> int:
             chapters=[
                 Chapter(index=0, title="First Chapter", content="secret body"),
                 Chapter(index=1, title="Second Chapter", content="more secret body"),
+            ],
+            fetched_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+        )
+    )
+
+
+def _seed_updatable_library(ndl_home: Path) -> int:
+    service = ServiceContainer(db_path=ndl_home / "library.db").library_service()
+    return service.save(
+        Novel(
+            title="Example Public Domain Novel",
+            author="Example Author",
+            source_url=BASE_URL,
+            source_rule_id="example_static",
+            status="ongoing",
+            chapters=[
+                Chapter(
+                    index=0,
+                    title="Chapter 1: Dawn",
+                    content="Morning arrived over the quiet archive.",
+                    source_url=f"{BASE_URL}/chapter/1",
+                )
             ],
             fetched_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
         )
