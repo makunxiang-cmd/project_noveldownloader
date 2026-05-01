@@ -47,7 +47,7 @@ Notes:
 
 ### P2.2 Library Repository
 
-Status: pending.
+Status: implemented.
 
 Scope:
 
@@ -60,6 +60,13 @@ Exit criteria:
 
 - Repository round-trips a fixture `Novel`
 - Removing a novel removes its chapters
+
+Notes:
+
+- `save()` is upsert-by-`(source_rule_id, source_url)`. `source_url is None` (TXT-derived novels) always inserts a fresh row.
+- Chapter replacement during upsert deletes existing chapters via `row.chapters.clear() + flush` before inserting the new ones, so the `(novel_id, index)` UNIQUE constraint never sees overlapping rows in a single statement batch.
+- `list()` returns `NovelSummary` (id + header fields + `chapter_count`); chapter bodies are not loaded, keeping the call cheap for `ndl library list`.
+- `get()` uses `selectinload(NovelRow.chapters)` and re-sorts chapters by index when materializing the domain `Novel`.
 
 ### P2.3 Library Service
 

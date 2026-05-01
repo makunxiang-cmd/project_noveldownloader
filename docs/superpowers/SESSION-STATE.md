@@ -2,7 +2,7 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
 >
-> 最后更新：2026-05-01（P2.1 存储基础完成：新增 sqlalchemy>=2 依赖、`src/ndl/storage/` 包、SQLite WAL + foreign_keys PRAGMA 默认、4 张 SQLAlchemy 2.0 Mapped 表（novels/chapters/download_jobs/settings）、session_scope 上下文管理器，8 个新单测全部通过；总测试 80 passed，覆盖率 89.66%。下一步进入 P2.2 LibraryRepository）
+> 最后更新：2026-05-01（P2.2 LibraryRepository 完成：upsert-by-(rule_id, source_url) 的 save、list 摘要、get 带章节、remove 级联；新增 NovelSummary dataclass；9 个新单测；总测试 89 passed，覆盖率 90.24%。下一步进入 P2.3 LibraryService）
 
 ---
 
@@ -26,6 +26,7 @@
 | **P1.5 Download/Convert 服务层** | `application/services/download.py` 编排 Fetcher/Parser；`application/services/convert.py` 编排 Reader/Writer；`application/container.py` 提供轻量工厂；服务层进度回调已覆盖 | 见 P1 plan §P1.5 |
 | **P1.6 CLI 命令** | `ndl download` / `ndl convert` / `ndl rules validate`；download 首跑免责声明 gate；`typer.testing` + mocked HTTP 覆盖端到端下载到 EPUB | 见 P1 plan §P1.6 |
 | **P2.1 存储基础** | `src/ndl/storage/`：engine 工厂（WAL + foreign_keys=ON PRAGMA）、`session_scope` 上下文管理器、SQLAlchemy 2.0 Mapped 模型 4 张表（`NovelRow` / `ChapterRow` / `DownloadJobRow` / `SettingRow`）；新依赖 `sqlalchemy>=2.0`；8 个新 unit test 覆盖 schema、PRAGMA、唯一约束、级联删除、settings KV、status check | 见 P2 plan §P2.1 |
+| **P2.2 LibraryRepository** | `src/ndl/storage/repository.py`：`LibraryRepository` 提供 save/list/get/remove；upsert 锚点 `(source_rule_id, source_url)`，章节替换走 `clear() + flush` 再 insert 避免 UNIQUE 冲突；list 走 `func.count` 单查询返回 `NovelSummary` 摘要；9 个新 unit test 覆盖 round-trip / upsert / 无 source_url 总插入 / list 计数 / 缺失返回 None / remove 级联 | 见 P2 plan §P2.2 |
 
 ### 当前活动 Plan
 
@@ -41,17 +42,17 @@
 当前活动计划：**`docs/superpowers/plans/2026-04-30-ndl-p2-library.md`** —— P2 书库持久化计划：
 
 - P2.1 ✅ implemented — SQLite/SQLAlchemy 存储基础
-- **P2.2 ⏭ next** — LibraryRepository（`storage/repository.py`，Novel/Chapter ↔ Row 双向映射）
-- P2.3 ⏳ pending — LibraryService
+- P2.2 ✅ implemented — LibraryRepository（save/list/get/remove + Novel↔Row 双向映射）
+- **P2.3 ⏭ next** — LibraryService（应用层 + 决定 download 是否默认入库）
 - P2.4 ⏳ pending — `ndl library` CLI 命令
 
 ### 质量门当前状态
 
 ```
 ruff check / format     ✅
-mypy --strict (39 文件) ✅
-pytest                  ✅ 80 passed
-coverage                ✅ 89.66%（fail_under=80）
+mypy --strict (40 文件) ✅
+pytest                  ✅ 89 passed
+coverage                ✅ 90.24%（fail_under=80）
 ```
 
 ### 本轮（2026-04-30）审计修复要点
@@ -115,7 +116,7 @@ uv run pre-commit run --all-files
    - src/ndl/cli/         ✅ P1.6
    - src/ndl/storage/     ✅ P2.1
 6. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
-7. P2.1 已完成；下一步进入 P2.2 LibraryRepository
+7. P2.2 已完成；下一步进入 P2.3 LibraryService
 8. 完成新切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
 ```
 
@@ -132,18 +133,18 @@ uv run pre-commit run --all-files
 
 ---
 
-## 3. 下一步（P2.2 LibraryRepository）的预备信息
+## 3. 下一步（P2.3 LibraryService）的预备信息
 
-接手 agent 应按 `docs/superpowers/plans/2026-04-30-ndl-p2-library.md` 实施 P2.2。基础已经就绪：
+接手 agent 应按 `docs/superpowers/plans/2026-04-30-ndl-p2-library.md` 实施 P2.3。基础已经就绪：
 
-- `src/ndl/storage/`：engine 工厂 + session_scope + 4 张 Mapped 表已上线（P2.1 完成）
-- 下一步要写：`src/ndl/storage/repository.py`，提供 `LibraryRepository`（save/list/get/remove novel + 章节级联），以及 `Novel`/`Chapter` 与 `NovelRow`/`ChapterRow` 的双向映射
+- `src/ndl/storage/`：engine 工厂 + session_scope + 4 张 Mapped 表 + LibraryRepository（P2.1+P2.2 完成）
+- 下一步要写：`src/ndl/application/services/library.py`，提供 `LibraryService`（save/list/get/remove/export 等），并决定下载结果如何流入仓储
+- 同步要做的接线：`ServiceContainer` 注入 `LibraryRepository`（按 `~/.ndl/library.db` 路径解析，复用 `NDL_HOME`）
 
-P2.2 之后还有：
+P2.3 之后还有：
 
-- P2.3 LibraryService：服务层方法 save/list/get/remove；决定 download 是否默认入库
 - P2.4 CLI：`ndl library list/show/remove`
-- 待决策（已锁定方向）：
+- 已锁定方向：
   - download 默认自动入库，提供 `--no-save` 退出口（P2.4 落地）
   - DB 路径 `~/.ndl/library.db`（与免责声明 marker 同位置，复用 `NDL_HOME`）
 

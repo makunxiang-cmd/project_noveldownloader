@@ -15,12 +15,15 @@ from ndl.storage.models import (
     NovelRow,
     SettingRow,
 )
+from ndl.storage.repository import LibraryRepository, NovelSummary
 
 __all__ = [
     "Base",
     "ChapterRow",
     "DownloadJobRow",
+    "LibraryRepository",
     "NovelRow",
+    "NovelSummary",
     "SettingRow",
     "create_database_engine",
     "create_session_factory",
