@@ -41,10 +41,15 @@ def _render_header(novel: Novel) -> str:
     lines = [
         f"# {novel.title}",
         f"作者:{novel.author}",
-        f"来源:{novel.source_url}",
-        f"规则:{novel.source_rule_id}",
-        f"状态:{novel.status}",
     ]
+    if novel.source_url:
+        lines.append(f"来源:{novel.source_url}")
+    lines.extend(
+        [
+            f"规则:{novel.source_rule_id}",
+            f"状态:{novel.status}",
+        ]
+    )
     if novel.summary:
         lines.extend(["", "简介:", novel.summary.strip()])
     lines.extend(["", "正文"])

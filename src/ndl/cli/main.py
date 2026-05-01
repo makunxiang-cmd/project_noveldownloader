@@ -10,11 +10,9 @@ import typer
 
 from ndl import __version__
 from ndl.application.container import ServiceContainer
-from ndl.application.services import ConvertService, DownloadService
 from ndl.cli.disclaimer import ensure_download_disclaimer
+from ndl.cli.renderers import cli_progress
 from ndl.core.errors import NDLError
-from ndl.fetchers import HttpFetcher
-from ndl.parsers import HtmlParser
 from ndl.rules import load_rule_file
 
 app = typer.Typer(
@@ -72,9 +70,7 @@ def convert(
 ) -> None:
     """Convert a local novel file to another supported format."""
     try:
-        written = asyncio.run(
-            ConvertService().convert(input_path, output_path, target_format=target_format)
-        )
+        written = asyncio.run(_convert(input_path, output_path, target_format=target_format))
     except NDLError as exc:
         _raise_cli_error(exc)
     typer.echo(f"Wrote {written}")
@@ -134,10 +130,19 @@ app.add_typer(rules_app, name="rules")
 
 async def _download(url: str, output_path: Path, *, target_format: str | None) -> Path:
     container = ServiceContainer()
-    rule = container.rule_for(url)
-    async with HttpFetcher(rule) as fetcher:
-        novel = await DownloadService(fetcher=fetcher, parser=HtmlParser(rule)).download(url)
-    return await ConvertService().convert(novel, output_path, target_format=target_format)
+    async with cli_progress() as progress:
+        novel = await container.download(url, progress=progress)
+        return await container.convert_service(progress=progress).convert(
+            novel, output_path, target_format=target_format
+        )
+
+
+async def _convert(input_path: Path, output_path: Path, *, target_format: str | None) -> Path:
+    container = ServiceContainer()
+    async with cli_progress() as progress:
+        return await container.convert_service(progress=progress).convert(
+            input_path, output_path, target_format=target_format
+        )
 
 
 def _raise_cli_error(exc: NDLError) -> NoReturn:

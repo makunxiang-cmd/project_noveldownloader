@@ -15,12 +15,8 @@ class NDLError(Exception):
         self.message = message
         self.detail = detail
 
-    def user_message(self, lang: str = "zh_CN") -> str:
-        """Return a concise user-facing message.
-
-        `lang` is accepted now so callers can depend on the API before i18n is
-        implemented. Current messages are authored in English.
-        """
+    def user_message(self) -> str:
+        """Return a concise user-facing message."""
         if self.detail:
             return f"{self.message}\n\n{self.detail}"
         return self.message
@@ -79,12 +75,11 @@ class HTTPError(FetchError):
     """A non-success HTTP status remained after retries."""
 
     def __init__(self, url: str, status_code: int) -> None:
-        status = (
-            HTTPStatus(status_code).phrase
-            if status_code in HTTPStatus._value2member_map_
-            else "HTTP error"
-        )
-        super().__init__(f"HTTP request failed with {status_code} {status}.", detail=f"URL: {url}")
+        try:
+            phrase = HTTPStatus(status_code).phrase
+        except ValueError:
+            phrase = "HTTP error"
+        super().__init__(f"HTTP request failed with {status_code} {phrase}.", detail=f"URL: {url}")
         self.url = url
         self.status_code = status_code
 

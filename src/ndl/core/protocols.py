@@ -14,6 +14,9 @@ class Fetcher(Protocol):
     async def get(self, url: str, *, encoding: str | None = None) -> str:
         """Return response text for `url` or raise a FetchError."""
 
+    async def aclose(self) -> None:
+        """Release any underlying connections held by the fetcher."""
+
 
 class Parser(Protocol):
     """Parses fetched text into domain objects."""

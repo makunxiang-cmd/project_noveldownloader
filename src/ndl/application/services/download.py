@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from ndl.application.services._progress import emit_progress
-from ndl.core.models import Chapter, Novel
+from ndl.core.models import Chapter, ChapterStub, Novel
 from ndl.core.progress import ProgressCallback
 from ndl.core.protocols import Fetcher, Parser
 
@@ -51,23 +53,7 @@ class DownloadService:
             done=0,
             message="Fetching chapters.",
         )
-        chapters: list[Chapter] = []
-        for stub in stubs:
-            chapter_html = await self._fetcher.get(stub.url)
-            chapter = self._parser.parse_chapter(
-                chapter_html,
-                index=stub.index,
-                source_url=stub.url,
-            )
-            chapters.append(chapter)
-            await emit_progress(
-                self._progress,
-                kind="chapter",
-                stage="fetching_chapters",
-                total=len(stubs),
-                done=len(chapters),
-                current_title=chapter.title,
-            )
+        chapters = await self._fetch_chapters(stubs)
 
         completed = novel.model_copy(
             update={"chapters": sorted(chapters, key=lambda item: item.index)}
@@ -81,3 +67,36 @@ class DownloadService:
             message="Download complete.",
         )
         return completed
+
+    async def _fetch_chapters(self, stubs: list[ChapterStub]) -> list[Chapter]:
+        """Fetch chapters concurrently. Per-host concurrency cap is enforced by the fetcher."""
+        if not stubs:
+            return []
+        tasks = [asyncio.create_task(self._fetch_chapter(stub)) for stub in stubs]
+        chapters: list[Chapter] = []
+        try:
+            for coro in asyncio.as_completed(tasks):
+                chapter = await coro
+                chapters.append(chapter)
+                await emit_progress(
+                    self._progress,
+                    kind="chapter",
+                    stage="fetching_chapters",
+                    total=len(stubs),
+                    done=len(chapters),
+                    current_title=chapter.title,
+                )
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+        return chapters
+
+    async def _fetch_chapter(self, stub: ChapterStub) -> Chapter:
+        chapter_html = await self._fetcher.get(stub.url)
+        return self._parser.parse_chapter(
+            chapter_html,
+            index=stub.index,
+            source_url=stub.url,
+        )

@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterable, Mapping
 
 from ndl.application.services import ConvertService, DownloadService
 from ndl.converters import WriterRegistry, default_writer_registry
+from ndl.core.models import Novel
 from ndl.core.progress import ProgressCallback
 from ndl.core.protocols import Fetcher, Parser, Reader
 from ndl.fetchers import HttpFetcher
@@ -38,19 +39,32 @@ class ServiceContainer:
         """Resolve the SourceRule for `url`."""
         return self._resolver.resolve(url)
 
-    def download_service_for(
+    def fetcher_for(self, rule: SourceRule) -> Fetcher:
+        """Build a Fetcher for `rule` using the configured factory."""
+        return self._fetcher_factory(rule)
+
+    def parser_for(self, rule: SourceRule) -> Parser:
+        """Build a Parser for `rule` using the configured factory."""
+        return self._parser_factory(rule)
+
+    async def download(
         self,
         url: str,
         *,
         progress: ProgressCallback | None = None,
-    ) -> DownloadService:
-        """Build a DownloadService for the rule matching `url`."""
+    ) -> Novel:
+        """Resolve the rule, build dependencies, and download `url` end-to-end."""
         rule = self.rule_for(url)
-        return DownloadService(
-            fetcher=self._fetcher_factory(rule),
-            parser=self._parser_factory(rule),
-            progress=progress,
-        )
+        fetcher = self.fetcher_for(rule)
+        try:
+            service = DownloadService(
+                fetcher=fetcher,
+                parser=self.parser_for(rule),
+                progress=progress,
+            )
+            return await service.download(url)
+        finally:
+            await fetcher.aclose()
 
     def convert_service(self, *, progress: ProgressCallback | None = None) -> ConvertService:
         """Build a ConvertService with configured readers and writers."""

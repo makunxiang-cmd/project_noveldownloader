@@ -166,6 +166,73 @@ async def test_get_sends_user_agent_from_rule(rule: SourceRule) -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_get_honors_retry_after_header_on_429(
+    rule: SourceRule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("ndl.fetchers.http.asyncio.sleep", fake_sleep)
+    respx.get("https://site.test/page").mock(
+        side_effect=[
+            httpx.Response(429, headers={"Retry-After": "7"}),
+            httpx.Response(200, text="ok"),
+        ]
+    )
+
+    async with HttpFetcher(rule) as fetcher:
+        body = await fetcher.get("https://site.test/page")
+
+    assert body == "ok"
+    assert sleeps == [7.0]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_caps_retry_after_at_60_seconds(
+    rule: SourceRule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("ndl.fetchers.http.asyncio.sleep", fake_sleep)
+    respx.get("https://site.test/page").mock(
+        side_effect=[
+            httpx.Response(429, headers={"Retry-After": "9999"}),
+            httpx.Response(200, text="ok"),
+        ]
+    )
+
+    async with HttpFetcher(rule) as fetcher:
+        await fetcher.get("https://site.test/page")
+
+    assert sleeps == [60.0]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_injects_default_user_agent_when_rule_omits_it(tmp_path: Path) -> None:
+    yaml = RULE_YAML.replace(
+        '  headers:\n    User-Agent: "ndl-test/1.0"\n',
+        "",
+    )
+    path = tmp_path / "rule.yaml"
+    path.write_text(textwrap.dedent(yaml), encoding="utf-8")
+    rule = load_rule_file(path)
+    route = respx.get("https://site.test/page").mock(return_value=httpx.Response(200, text="ok"))
+
+    async with HttpFetcher(rule) as fetcher:
+        await fetcher.get("https://site.test/page")
+
+    assert route.calls.last.request.headers["user-agent"] == f"ndl/{rule.id}"
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_get_blocks_when_robots_disallows(tmp_path: Path) -> None:
     yaml = RULE_YAML.replace("respect: false", "respect: true").replace(
         '    ignore_justification: "test fixture"\n', ""

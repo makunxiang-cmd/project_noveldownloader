@@ -39,7 +39,8 @@ def write_epub(novel: Novel, output_path: Path) -> Path:
 def _build_book(novel: Novel) -> Any:
     book = epub.EpubBook()
     book.FOLDER_NAME = "OEBPS"
-    book.set_identifier(f"urn:uuid:{uuid5(NAMESPACE_URL, novel.source_url)}")
+    seed = novel.source_url or f"ndl:{novel.source_rule_id}:{novel.title}"
+    book.set_identifier(f"urn:uuid:{uuid5(NAMESPACE_URL, seed)}")
     book.set_title(novel.title)
     book.set_language("zh-CN")
     book.add_author(novel.author)

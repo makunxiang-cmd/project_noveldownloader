@@ -22,16 +22,21 @@ class Chapter(BaseModel):
     word_count: int = Field(default=0, ge=0)
     published_at: datetime | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_word_count(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            existing = data.get("word_count") or 0
+            if existing == 0:
+                content = data.get("content", "") or ""
+                if isinstance(content, str):
+                    return {**data, "word_count": len("".join(content.split()))}
+        return data
+
     @field_validator("title")
     @classmethod
     def _strip_title(cls, value: str) -> str:
         return value.strip()
-
-    def model_post_init(self, __context: Any) -> None:
-        """Fill word_count after validation while preserving a frozen public model."""
-        if self.word_count == 0:
-            normalized = "".join(self.content.split())
-            object.__setattr__(self, "word_count", len(normalized))
 
 
 class ChapterStub(BaseModel):
@@ -52,11 +57,9 @@ class ChapterStub(BaseModel):
 class Novel(BaseModel):
     """The single in-memory representation shared by download and conversion flows."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     title: str = Field(min_length=1)
     author: str = Field(min_length=1)
-    source_url: str
+    source_url: str | None = None
     source_rule_id: str = Field(min_length=1)
     summary: str | None = None
     cover_url: str | None = None
@@ -71,12 +74,6 @@ class Novel(BaseModel):
     @classmethod
     def _strip_required_text(cls, value: str) -> str:
         return value.strip()
-
-    @field_validator("source_url")
-    @classmethod
-    def _validate_source_url(cls, value: str) -> str:
-        HttpUrl(value)
-        return value
 
     @field_validator("cover_url")
     @classmethod

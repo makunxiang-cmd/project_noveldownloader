@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote
 
 from ndl.core.errors import ConvertError
 from ndl.core.models import Chapter, Novel
@@ -93,7 +92,7 @@ class _TxtMetadata:
         *,
         title: str,
         author: str,
-        source_url: str,
+        source_url: str | None,
         source_rule_id: str,
         summary: str | None,
     ) -> None:
@@ -128,7 +127,7 @@ def _chapter_title(line: str) -> str | None:
 def _parse_metadata(lines: list[str], source_path: Path) -> _TxtMetadata:
     title = source_path.stem
     author = "unknown"
-    source_url = _local_source_url(source_path)
+    source_url: str | None = None
     source_rule_id = "txt"
     summary = _summary_from(lines)
     title_set = False
@@ -181,7 +180,7 @@ def _summary_from(lines: list[str]) -> str | None:
 def _parse_chapters(
     lines: list[str],
     headings: list[tuple[int, str]],
-    source_url: str,
+    source_url: str | None,
 ) -> list[Chapter]:
     chapters: list[Chapter] = []
     for order, (line_index, title) in enumerate(headings):
@@ -194,7 +193,7 @@ def _parse_chapters(
 def _single_chapter(
     lines: list[str],
     title: str,
-    source_url: str,
+    source_url: str | None,
     source_path: Path,
 ) -> list[Chapter]:
     content = _clean_body(_body_without_metadata(lines))
@@ -251,7 +250,3 @@ def _is_metadata_or_marker(line: str) -> bool:
 
 def _is_metadata_line(line: str) -> bool:
     return line.startswith(_METADATA_LABELS)
-
-
-def _local_source_url(source_path: Path) -> str:
-    return f"https://local.ndl.invalid/txt/{quote(source_path.name)}"

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from ndl.core.models import Chapter, ChapterStub, Novel
+from typing import TYPE_CHECKING
+
 from ndl.parsers.html_chapter import parse_chapter
 from ndl.parsers.html_index import parse_index
 from ndl.parsers.txt_reader import TxtReader, parse_txt, read_txt
-from ndl.rules.schema import SourceRule
+
+if TYPE_CHECKING:
+    from ndl.core.models import Chapter, ChapterStub, Novel
+    from ndl.rules.schema import SourceRule
 
 
 class HtmlParser:

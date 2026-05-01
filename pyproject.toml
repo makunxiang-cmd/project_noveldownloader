@@ -38,6 +38,7 @@ dev = [
   "pytest-cov>=4.1",
   "respx>=0.21",
   "ruff>=0.3",
+  "types-pyyaml>=6.0.12.20260408",
 ]
 docs = [
   "mkdocs>=1.5",
@@ -136,8 +137,3 @@ exclude_lines = [
   "\\.\\.\\.",
 ]
 fail_under = 80
-
-[dependency-groups]
-dev = [
-    "types-pyyaml>=6.0.12.20260408",
-]

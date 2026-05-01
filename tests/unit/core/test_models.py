@@ -32,12 +32,24 @@ def test_novel_requires_sorted_unique_chapters() -> None:
         )
 
 
-def test_novel_rejects_invalid_source_url() -> None:
+def test_novel_accepts_missing_source_url_for_local_inputs() -> None:
+    novel = Novel(
+        title="Example",
+        author="Author",
+        source_rule_id="txt",
+        fetched_at=datetime.now(timezone.utc),
+    )
+
+    assert novel.source_url is None
+
+
+def test_novel_rejects_invalid_cover_url() -> None:
     with pytest.raises(ValidationError):
         Novel(
             title="Example",
             author="Author",
-            source_url="not-a-url",
+            source_url="https://example.test/book/1",
             source_rule_id="example",
+            cover_url="not-a-url",
             fetched_at=datetime.now(timezone.utc),
         )

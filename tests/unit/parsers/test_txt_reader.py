@@ -78,7 +78,8 @@ def test_parse_txt_recognizes_common_chapter_heading_variants(tmp_path) -> None:
         "第十二章 风起",
         "Chapter 3 Return",
     ]
-    assert novel.source_url == "https://local.ndl.invalid/txt/book.txt"
+    assert novel.source_url is None
+    assert all(chapter.source_url is None for chapter in novel.chapters)
 
 
 def test_parse_txt_falls_back_to_single_chapter_without_headings(tmp_path) -> None:
