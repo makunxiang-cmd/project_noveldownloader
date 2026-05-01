@@ -11,7 +11,7 @@
 | License | MIT |
 | 设计文档版本 | 1.0 |
 
-> Implementation status, 2026-04-30: P0 and P1 download/convert MVP are implemented. P2 library persistence is the active next milestone. For current handoff state, read `docs/superpowers/SESSION-STATE.md`.
+> Implementation status, 2026-05-01: P0 through P4 are implemented, covering scaffold, download/convert MVP, library persistence, local Web UI, and update scheduling. P5 search and remote rule management is the active next milestone. For current handoff state, read `docs/superpowers/SESSION-STATE.md`.
 
 ---
 

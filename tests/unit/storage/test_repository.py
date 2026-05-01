@@ -103,7 +103,11 @@ def test_save_without_source_url_always_inserts(repo: LibraryRepository) -> None
     a_id = repo.save(a)
     b_id = repo.save(b)
     assert a_id != b_id
-    assert {repo.get(a_id).title, repo.get(b_id).title} == {"Local A", "Local B"}  # type: ignore[union-attr]
+    a_loaded = repo.get(a_id)
+    b_loaded = repo.get(b_id)
+    assert a_loaded is not None
+    assert b_loaded is not None
+    assert {a_loaded.title, b_loaded.title} == {"Local A", "Local B"}
 
 
 def test_list_returns_summaries_with_chapter_count(repo: LibraryRepository) -> None:
@@ -122,6 +126,26 @@ def test_list_includes_novels_without_chapters(repo: LibraryRepository) -> None:
     summaries = repo.list()
     assert len(summaries) == 1
     assert summaries[0].chapter_count == 0
+
+
+def test_append_chapters_updates_status_timestamp_without_new_chapters(
+    repo: LibraryRepository,
+) -> None:
+    novel_id = repo.save(_make_novel())
+    updated_at = datetime(2026, 5, 2, 10, 0, tzinfo=timezone.utc)
+
+    inserted = repo.append_chapters(
+        novel_id,
+        [],
+        updated_at=updated_at,
+        status="completed",
+    )
+
+    loaded = repo.get(novel_id)
+    assert inserted == 0
+    assert loaded is not None
+    assert loaded.status == "completed"
+    assert loaded.last_updated == updated_at.replace(tzinfo=None)
 
 
 def test_get_missing_returns_none(repo: LibraryRepository) -> None:

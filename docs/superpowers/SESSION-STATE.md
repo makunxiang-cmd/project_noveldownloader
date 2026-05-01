@@ -2,7 +2,7 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
 >
-> 最后更新：2026-05-01（P4.3 Web Update Trigger + Status 完成：首页新增 `Update all` 表单，`POST /updates` 调用 `UpdateService.update_all()` 并渲染每本书结果表；P4 plan 标记完成；新增 P5 Search and Remote Rules 计划。下一步进入 P5.1 Search domain + service）
+> 最后更新：2026-05-01（代码与文档审查完成：修正 P5 交接文档、补齐追更状态变化时的 `last_updated` 更新，并新增仓储回归测试。下一步进入 P5.1 Search domain + service）
 
 ---
 
@@ -82,9 +82,17 @@
 ```
 ruff check / format     ✅
 mypy --strict (48 文件) ✅
-pytest                  ✅ 123 passed
-coverage                ✅ 89.40%（fail_under=80）
+pytest                  ✅ 124 passed
+coverage                ✅ 89.41%（fail_under=80）
 ```
+
+### 本轮（2026-05-01）审查修补要点
+
+- `AGENTS.md`、`docs/developer/README.md`、设计文档实现状态、关键文件清单已同步到 P0-P4 完成、P5 当前活动计划
+- `LibraryRepository.append_chapters()` 现在会在小说状态变化但无新增章节时同步更新 `last_updated`
+- `tests/unit/storage/test_repository.py` 增加回归测试，覆盖“状态更新但追加 0 章”的追更边界
+- 清理 `storage.repository._coerce_status()` 的不必要 `type: ignore`
+- 完整质量门通过：ruff、format check、mypy、pytest coverage、pre-commit
 
 ### 本轮（2026-05-01）P4.1 完成要点
 
@@ -391,7 +399,9 @@ P2 退出条件已满足：
 │       │   ├── 2026-04-20-ndl-p0-scaffold.md         ← P0 计划（已完成）
 │       │   ├── 2026-04-29-ndl-p1-mvp.md              ← P1 计划（已完成）
 │       │   ├── 2026-04-30-ndl-p2-library.md          ← P2 计划（已完成）
-│       │   └── 2026-05-01-ndl-p3-web-ui.md           ← 当前活动 plan
+│       │   ├── 2026-05-01-ndl-p3-web-ui.md           ← P3 计划（已完成）
+│       │   ├── 2026-05-01-ndl-p4-update-scheduling.md ← P4 计划（已完成）
+│       │   └── 2026-05-01-ndl-p5-search-rules.md     ← 当前活动 plan
 │       └── specs/
 │           └── 2026-04-20-ndl-design.md              ← 设计基础（v0.1 全套）
 ├── pyproject.toml                                    ← 依赖与质量工具配置
@@ -401,10 +411,11 @@ P2 退出条件已满足：
 │   ├── parsers/     ✅ P1.2 + P1.4 TXT reader
 │   ├── fetchers/    ✅ P1.3
 │   ├── converters/  ✅ P1.4
-│   ├── application/ ✅ P1.5
-│   ├── cli/         ✅ P1.6 + P2.4 library commands + P3.4 serve
-│   ├── storage/     ✅ P2.1-P2.2
-│   ├── web/         ✅ P3.1-P3.5
+│   ├── application/ ✅ P1.5 + P2.3 library service + P4.1 update service
+│   ├── scheduler/   ✅ P4.2 recurring update jobs
+│   ├── cli/         ✅ P1.6 + P2.4 library commands + P3.4 serve + P4 update/serve scheduler flags
+│   ├── storage/     ✅ P2.1-P2.2 + P4.1 append-only updates
+│   ├── web/         ✅ P3.1-P3.5 + P4.3 update controls/results
 │   └── builtin_rules/example_static.yaml             ← 测试用规则
 └── tests/
     ├── contract/                                     ← 端到端契约测试 + fixtures

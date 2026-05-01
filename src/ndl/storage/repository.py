@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload, sessionmaker
@@ -101,9 +102,10 @@ class LibraryRepository:
                 chapter for chapter in chapters if chapter.index not in existing_indices
             ]
             row.chapters.extend(_chapter_to_row(chapter, updated_at) for chapter in new_chapters)
+            status_changed = status is not None and row.status != status
             if status is not None:
                 row.status = status
-            if new_chapters:
+            if new_chapters or status_changed:
                 row.last_updated = updated_at
             return len(new_chapters)
 
@@ -193,5 +195,5 @@ def _row_to_novel(row: NovelRow) -> Novel:
 
 def _coerce_status(value: str) -> NovelStatus:
     if value in ("ongoing", "completed", "unknown"):
-        return value  # type: ignore[return-value]
+        return cast(NovelStatus, value)
     return "unknown"

@@ -64,7 +64,7 @@ All slices should keep these gates green.
 Before starting new work, read:
 
 1. `docs/superpowers/SESSION-STATE.md`
-2. The active plan named there (`docs/superpowers/plans/2026-05-01-ndl-p4-update-scheduling.md`)
+2. The active plan named there (`docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md`)
 3. `AGENTS.md`
 
 `git log --oneline` is the authoritative record of completed work.
