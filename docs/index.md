@@ -2,7 +2,18 @@
 
 Welcome to the NDL documentation.
 
-**Status:** Under active development. P0 scaffold and P1 MVP download/convert path are implemented; P2 library persistence is next. Full content will be populated as the project advances through its roadmap.
+**Status:** Under active development. P0 scaffold and the P1 MVP download/convert path are implemented; P2 library persistence is next. Agent handoff state is tracked in `superpowers/SESSION-STATE.md`.
+
+## Current Capabilities
+
+- `ndl rules validate <rule.yaml>` validates YAML source rules.
+- `ndl convert book.txt -o book.epub` converts local TXT input to TXT or EPUB.
+- `ndl download <url> -o book.epub --accept-disclaimer` downloads a rule-matched static HTML source and writes TXT or EPUB.
+- Downloads honor the bundled rule's robots.txt, rate-limit, retry, and encoding policies.
+
+## Next Milestone
+
+P2 adds local SQLite library persistence and `ndl library {list,show,remove}`. See the implementation handoff notes under `superpowers/SESSION-STATE.md` and the P2 plan under `superpowers/plans/2026-04-30-ndl-p2-library.md`.
 
 ## Sections
 

@@ -10,9 +10,16 @@
 
 ## Status
 
-Under active development. P0 scaffold and P1 MVP download/convert path are implemented; P2 library persistence is next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, and library management. See `docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md` for slice-by-slice progress.
+Under active development. P0 scaffold and the P1 MVP download/convert path are implemented; P2 library persistence is next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, and library management. See `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
 
-## What It Does (Planned)
+## What Works Now
+
+- Validate YAML source rules with `ndl rules validate`
+- Download a rule-matched static HTML fixture site to TXT or EPUB
+- Convert local TXT files to TXT or EPUB
+- Enforce robots.txt, per-host rate limits, retries, and a first-run lawful-use disclaimer for downloads
+
+## What It Does (Roadmap)
 
 - Download Chinese web novels from static HTML sites, with Playwright for JS-heavy sites as an optional extra
 - Convert between TXT and EPUB formats, standalone or after download
@@ -31,19 +38,26 @@ NDL does not and will not:
 
 See [`DISCLAIMER.md`](DISCLAIMER.md) for the full ethics and legal stance.
 
-## Install (Coming Soon)
+## Development Install
 
 ```bash
-pip install ndl
-pip install ndl[browser]
+uv sync
+uv run ndl --version
 ```
 
-## Usage Preview
+The package has not been released to PyPI yet.
+
+## Usage
 
 ```bash
 ndl download <url> -o book.epub --accept-disclaimer
 ndl convert book.txt -o book.epub
 ndl rules validate my-rule.yaml
+```
+
+Planned for P2+:
+
+```bash
 ndl library list
 ndl update --all
 ndl serve

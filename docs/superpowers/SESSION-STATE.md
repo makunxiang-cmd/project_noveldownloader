@@ -2,7 +2,7 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
 >
-> 最后更新：2026-04-30（P1.6 CLI 命令切片完成；P1 MVP 下载/转换路径完成；下一步创建 P2 书库持久化计划）
+> 最后更新：2026-04-30（P1 MVP 完成 + 一轮全面审计修复：CLI 走容器并接 rich 进度、章节并发、429 Retry-After、UA 单一来源、Novel.source_url 可空、删私有 HTTPStatus 访问、CHANGELOG 重新分类、spec §2.1/§8.1 与扁平实现对齐、新增 CONTEXT.md + ADR-0001。下一步进入 P2.1）
 
 ---
 
@@ -28,7 +28,7 @@
 
 ### 当前活动 Plan
 
-**`docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md`** ——  P1 MVP 实施计划，6 个切片：
+已完成计划：**`docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md`** —— P1 MVP 实施计划，6 个切片：
 
 - P1.1 ✅ implemented
 - P1.2 ✅ implemented
@@ -37,14 +37,51 @@
 - P1.5 ✅ implemented
 - P1.6 ✅ implemented
 
+当前待执行计划：**`docs/superpowers/plans/2026-04-30-ndl-p2-library.md`** —— P2 书库持久化计划：
+
+- **P2.1 ⏭ next** — SQLite/SQLAlchemy 存储基础
+- P2.2 ⏳ pending — LibraryRepository
+- P2.3 ⏳ pending — LibraryService
+- P2.4 ⏳ pending — `ndl library` CLI 命令
+
 ### 质量门当前状态
 
 ```
 ruff check / format     ✅
-mypy --strict (35 文件) ✅
-pytest                  ✅ 67 passed
-coverage                ✅ 92.05%（fail_under=80）
+mypy --strict (36 文件) ✅
+pytest                  ✅ 72 passed
+coverage                ✅ 89.27%（fail_under=80）
 ```
+
+### 本轮（2026-04-30）审计修复要点
+
+**行为层（spec ↔ 代码对齐）**
+
+- `DownloadService` 使用 `asyncio.create_task` + `as_completed` 并发抓取章节；并发上限由 fetcher 内的 `HostThrottle` 按 rule.rate_limit.max_concurrency 强制（不再每秒只发一个请求）
+- `HttpFetcher` 在 HTTP 429 时识别 `Retry-After` header（delta-seconds 或 HTTP-date），上限 60s，否则回退到 backoff
+- `HttpFetcher` 现在用 `_resolve_headers()` 计算单一 headers 集合，robots 检查与实际请求使用同一个 User-Agent
+- CLI `download` / `convert` 通过 `ServiceContainer.download(url, progress=...)` / `container.convert_service(progress=...)` 走容器；fetcher 生命周期由容器在 try/finally 内 aclose
+- 新增 `ndl.cli.renderers.cli_progress` 异步上下文管理器，把 `ProgressEvent` 渲染为 `rich.progress`；非交互（如 CI/CliRunner）静默回退到 None
+
+**领域层（小重构）**
+
+- `Novel.source_url: str | None`，删除 `HttpUrl` 校验；TXT 来源不再伪造 `https://local.ndl.invalid/...`，TXT-derived Novel 的 `source_url` 默认 None
+- `Chapter.word_count` 改用 `model_validator(mode="before")` 注入，不再 `object.__setattr__` 绕 frozen
+- `Novel` 删 `arbitrary_types_allowed`（无依赖任意类型）
+- `Fetcher` Protocol 新增 `aclose()`，让容器/测试 fetcher 共享单一生命周期约定
+- `NDLError.user_message()` 删除未使用的 `lang` 参数（i18n 在 P5 重新设计）
+- `core.errors.HTTPError` 用 `try HTTPStatus(code)` 替换 `_value2member_map_` 私有访问
+
+**包/构建**
+
+- `pyproject.toml` 把 dev deps 全部归到 `[project.optional-dependencies].dev`（含 `types-pyyaml`），删除冗余的 `[dependency-groups]`
+- `parsers/__init__.py` 把仅类型用途的 import 收进 `if TYPE_CHECKING`
+
+**文档/约定**
+
+- `CHANGELOG.md` 把误归在 "Changed" 的 P0 加项重新放回 "Added"；新增本轮变更条目
+- `docs/superpowers/specs/2026-04-20-ndl-design.md` §2.1 标注扁平 src-layout（不再实现 `infrastructure/` 目录），§8.1 增加 "P1 实际生效" 与按 P 阶段引入的清单
+- 新增 `CONTEXT.md`（领域词汇表）+ `docs/adr/0001-architecture-and-deps.md`（首条 ADR：扁平布局 + 阶段化引入依赖）+ `.scratch/.gitkeep`（issue tracker 根目录）
 
 每个切片必须保持以下命令全绿：
 
@@ -64,7 +101,7 @@ uv run pre-commit run --all-files
 
 ```
 1. Read docs/superpowers/SESSION-STATE.md（本文件）
-2. Read docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md（活动 plan）
+2. Read docs/superpowers/plans/2026-04-30-ndl-p2-library.md（活动 plan）
 3. Read AGENTS.md + docs/agents/issue-tracker.md（约定）
 4. 检查仓库状态：git log --oneline -10 + git status，确认本地工作区干净
 5. 确认本文件 §1 的"已完成"列表与代码实际情况一致：
@@ -76,7 +113,7 @@ uv run pre-commit run --all-files
    - src/ndl/application/ ✅ P1.5
    - src/ndl/cli/         ✅ P1.6
 6. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
-7. P1 已完成；下一步先创建 P2 书库持久化计划，再进入实现
+7. P1 已完成；下一步进入 P2.1 Storage Foundation
 8. 完成新切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
 ```
 
@@ -95,7 +132,7 @@ uv run pre-commit run --all-files
 
 ## 3. 下一步（P2 书库持久化）的预备信息
 
-接手 agent 应先创建 P2 计划，再实施。P2 设计文档范围见 `docs/superpowers/specs/2026-04-20-ndl-design.md` §10：
+接手 agent 应按 `docs/superpowers/plans/2026-04-30-ndl-p2-library.md` 实施 P2.1。P2 设计文档范围见 `docs/superpowers/specs/2026-04-20-ndl-design.md` §10：
 
 - `storage/`：SQLite + SQLAlchemy 2.0 Mapped style + WAL（当前尚未引入依赖）
 - `services(library)`：下载结果入库、书籍列表/详情/删除
@@ -170,7 +207,8 @@ uv run pre-commit run --all-files
 │       ├── SESSION-STATE.md                          ← 本文件
 │       ├── plans/
 │       │   ├── 2026-04-20-ndl-p0-scaffold.md         ← P0 计划（已完成）
-│       │   └── 2026-04-29-ndl-p1-mvp.md              ← 当前活动 plan
+│       │   ├── 2026-04-29-ndl-p1-mvp.md              ← P1 计划（已完成）
+│       │   └── 2026-04-30-ndl-p2-library.md          ← 当前活动 plan
 │       └── specs/
 │           └── 2026-04-20-ndl-design.md              ← 设计基础（v0.1 全套）
 ├── pyproject.toml                                    ← 依赖与质量工具配置

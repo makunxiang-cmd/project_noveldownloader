@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Current handoff
+
+Before changing code, read `docs/superpowers/SESSION-STATE.md` and the active plan named there. As of the latest sync, P1 is complete and the next work is P2 library persistence.
+
 ## Agent skills
 
 ### Issue tracker

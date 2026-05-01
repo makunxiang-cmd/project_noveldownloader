@@ -17,14 +17,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - P1.1 domain foundation: `Chapter`, `Novel`, `ChapterStub`, progress events, protocols, and typed error hierarchy
 - P1.1 rule foundation: Pydantic YAML schema, selector DSL helpers, rule loader/resolver, and bundled `example_static` rule
 - Contract fixture baseline for bundled rules
+- Concurrent chapter fetching in `DownloadService`, capped by the rule's `rate_limit.max_concurrency` via the per-host throttle
+- Rich-backed CLI progress renderer (`ndl.cli.renderers.cli_progress`) wired into `download` and `convert`; non-interactive runs degrade silently
+- `ServiceContainer.download(url, progress=...)` end-to-end helper that owns Fetcher lifecycle and the new `fetcher_for` / `parser_for` accessors
+- HTTP 429 retries now honor the `Retry-After` header (delta-seconds or HTTP-date), capped at 60s
+- `Fetcher` Protocol now declares `aclose()` so service containers and tests can rely on a single shutdown contract
+- Repository domain conventions: `CONTEXT.md` glossary, first ADR (`docs/adr/0001-architecture-and-deps.md`), and `.scratch/` issue tracker root
 
 ### Changed
 
+- P0 scaffold (project structure, CI, lint/type/test tooling, MkDocs skeleton, `ndl --version`, community files, issue/PR templates, GitHub Actions CI matrix) is now complete; previously listed under "Changed" by mistake
+- Documentation reflects P1 completion, current CLI capabilities, and the P2 library persistence handoff plan
 - Contract test for bundled rules now exercises the parsers end-to-end instead of selector helpers directly
-- P0 scaffold complete: project structure, CI, linting/type/test tooling, MkDocs skeleton
-- `ndl --version` / `ndl -V` CLI command
-- Community files: LICENSE (MIT), DISCLAIMER, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY
-- Issue templates (bug / rule / feature) and PR template
-- GitHub Actions CI: lint + format + mypy + test matrix (3 OS x 3 Python)
+- CLI `download` / `convert` route through `ServiceContainer` instead of instantiating fetchers and parsers ad hoc
+- `Novel.source_url` is now optional (`str | None`); HTTP-URL validation moved off the field so TXT-derived novels no longer need a synthetic placeholder
+- `Chapter.word_count` is filled by a `model_validator(mode="before")` instead of bypassing the frozen model with `object.__setattr__`
+- `HttpFetcher` now resolves a single set of request headers (with a guaranteed `User-Agent`) so robots checks and real requests use the same identity
+- `NDLError.user_message()` no longer takes an unused `lang` parameter; i18n will reintroduce a structured API in P5
+- `pyproject.toml` collapses dev dependencies into a single `[project.optional-dependencies].dev` group (was split across `[dependency-groups]`)
+
+### Fixed
+
+- `core.errors.HTTPError` no longer reads `HTTPStatus._value2member_map_`; it falls back to "HTTP error" via `HTTPStatus(code)` / `ValueError`
 
 [Unreleased]: https://github.com/makunxiang-cmd/project_noveldownloader/commits/main
