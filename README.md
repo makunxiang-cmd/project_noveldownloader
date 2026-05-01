@@ -54,14 +54,14 @@ The package has not been released to PyPI yet.
 ndl download <url> -o book.epub --accept-disclaimer
 ndl convert book.txt -o book.epub
 ndl library list
+ndl serve --accept-disclaimer
 ndl rules validate my-rule.yaml
 ```
 
-Planned for P3+:
+Planned for P4+:
 
 ```bash
 ndl update --all
-ndl serve
 ```
 
 ## Contributing

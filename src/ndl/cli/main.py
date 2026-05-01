@@ -15,7 +15,7 @@ from ndl import __version__
 from ndl.application.container import ServiceContainer
 from ndl.cli.disclaimer import ensure_download_disclaimer
 from ndl.cli.renderers import cli_progress
-from ndl.core.errors import NDLError, UserError
+from ndl.core.errors import InvalidArgumentError, NDLError, UserError
 from ndl.core.models import Novel
 from ndl.rules import load_rule_file
 from ndl.storage import NovelSummary
@@ -121,6 +121,44 @@ def download(
         typer.echo(f"Saved to library: {novel_id}")
 
 
+@app.command()
+def serve(
+    host: Annotated[
+        str,
+        typer.Option("--host", help="Host interface for the local Web UI."),
+    ] = "127.0.0.1",
+    port: Annotated[
+        int,
+        typer.Option("--port", min=1, max=65535, help="Port for the local Web UI."),
+    ] = 8000,
+    reload: Annotated[
+        bool,
+        typer.Option("--reload", help="Enable uvicorn auto-reload for development."),
+    ] = False,
+    accept_disclaimer: Annotated[
+        bool,
+        typer.Option(
+            "--accept-disclaimer",
+            help="Accept the lawful-use download disclaimer for this machine.",
+        ),
+    ] = False,
+    allow_public_host: Annotated[
+        bool,
+        typer.Option(
+            "--allow-public-host",
+            help="Allow binding the Web UI to a non-localhost interface.",
+        ),
+    ] = False,
+) -> None:
+    """Serve the local Web UI."""
+    try:
+        ensure_download_disclaimer(accept=accept_disclaimer)
+        _validate_serve_host(host, allow_public_host=allow_public_host)
+        _run_web_server(host=host, port=port, reload=reload)
+    except NDLError as exc:
+        _raise_cli_error(exc)
+
+
 @library_app.command("list")
 def library_list() -> None:
     """List saved novels in the local library."""
@@ -223,6 +261,36 @@ async def _convert(input_path: Path, output_path: Path, *, target_format: str | 
 def _raise_cli_error(exc: NDLError) -> NoReturn:
     typer.echo(exc.user_message(), err=True)
     raise typer.Exit(exc.exit_code)
+
+
+def _validate_serve_host(host: str, *, allow_public_host: bool) -> None:
+    if allow_public_host or _is_local_bind(host):
+        return
+    raise InvalidArgumentError(
+        "Refusing to expose the Web UI on a public interface.",
+        detail=(
+            f"Host: {host}\n"
+            "Use the default 127.0.0.1 for local access, or pass --allow-public-host "
+            "after confirming your network exposure is intentional."
+        ),
+    )
+
+
+def _is_local_bind(host: str) -> bool:
+    normalized = host.strip().lower()
+    return normalized in {"127.0.0.1", "localhost", "::1", "[::1]"}
+
+
+def _run_web_server(*, host: str, port: int, reload: bool) -> None:
+    import uvicorn
+
+    uvicorn.run(
+        "ndl.web.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        reload=reload,
+    )
 
 
 def _load_library_novel(novel_id: int) -> Novel:

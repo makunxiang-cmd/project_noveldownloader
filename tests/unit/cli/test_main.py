@@ -83,6 +83,76 @@ def test_download_requires_disclaimer_acceptance(tmp_path) -> None:
     assert not output_path.exists()
 
 
+def test_serve_requires_disclaimer_acceptance(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        ["serve"],
+        env={"NDL_HOME": str(tmp_path / "ndl-home")},
+    )
+
+    assert result.exit_code == 2
+    assert "--accept-disclaimer" in result.output
+
+
+def test_serve_runs_uvicorn_after_acceptance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, int, bool]] = []
+
+    def _fake_run(*, host: str, port: int, reload: bool) -> None:
+        calls.append((host, port, reload))
+
+    monkeypatch.setattr("ndl.cli.main._run_web_server", _fake_run)
+
+    result = runner.invoke(
+        app,
+        ["serve", "--accept-disclaimer", "--port", "8123", "--reload"],
+        env={"NDL_HOME": str(tmp_path / "ndl-home")},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [("127.0.0.1", 8123, True)]
+
+
+def test_serve_rejects_public_host_without_explicit_allow(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, int, bool]] = []
+    monkeypatch.setattr(
+        "ndl.cli.main._run_web_server",
+        lambda *, host, port, reload: calls.append((host, port, reload)),
+    )
+
+    result = runner.invoke(
+        app,
+        ["serve", "--accept-disclaimer", "--host", "0.0.0.0"],
+        env={"NDL_HOME": str(tmp_path / "ndl-home")},
+    )
+
+    assert result.exit_code == 2
+    assert "public interface" in result.output
+    assert calls == []
+
+
+def test_serve_allows_public_host_with_explicit_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, int, bool]] = []
+    monkeypatch.setattr(
+        "ndl.cli.main._run_web_server",
+        lambda *, host, port, reload: calls.append((host, port, reload)),
+    )
+
+    result = runner.invoke(
+        app,
+        ["serve", "--accept-disclaimer", "--host", "0.0.0.0", "--allow-public-host"],
+        env={"NDL_HOME": str(tmp_path / "ndl-home")},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [("0.0.0.0", 8000, False)]
+
+
 @pytest.fixture(autouse=True)
 def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     """Skip real sleeping in CLI download tests."""

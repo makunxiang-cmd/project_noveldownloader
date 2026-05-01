@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- P3.4 `ndl serve` CLI with `--host`, `--port`, `--reload`, `--accept-disclaimer`, and `--allow-public-host`; defaults to localhost and refuses public binds unless explicitly allowed
+- P3.4 CLI tests covering the serve disclaimer gate, uvicorn wrapper arguments, and public-host validation without starting a real server
 - P3.3 Web download flow: homepage download form, URL-encoded form handling without `python-multipart`, in-memory download job registry, native EventSource progress rendering, and `/downloads/{job_id}/events` SSE endpoint
 - P3.3 Web download tests: mocked HTTP web-triggered download persists to the temp library, no-save skips persistence, SSE emits progress/status events, and missing URL validation returns a user-visible error
 - P3.2 read-only Web library views: list rows link to `/library/{id}`, detail pages render novel metadata and chapter titles/word counts without bodies, and missing IDs render a 404 error template
