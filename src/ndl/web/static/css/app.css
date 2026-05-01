@@ -306,6 +306,21 @@ h2 {
   padding-left: 20px;
 }
 
+.job-result {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-bottom: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.job-result code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 .error-panel pre {
   margin: 14px 0 18px;
   white-space: pre-wrap;

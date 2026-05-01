@@ -21,6 +21,17 @@
       </div>
     </dl>
     <ol class="progress-log" data-progress-log></ol>
+    <div class="job-result" data-job-result hidden>
+      <p class="eyebrow" data-result-label></p>
+      <p data-result-message></p>
+      <p data-result-output hidden>
+        Output: <code data-result-output-path></code>
+      </p>
+      <p data-result-library hidden>
+        Saved to library:
+        <a class="text-link" data-result-library-link href="#"></a>
+      </p>
+    </div>
     <a class="text-link" href="/">Library</a>
   </section>
 {% endblock %}

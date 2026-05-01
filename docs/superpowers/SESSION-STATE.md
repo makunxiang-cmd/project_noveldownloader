@@ -2,7 +2,7 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
 >
-> 最后更新：2026-05-01（P2.3 LibraryService + ServiceContainer 接线完成：薄包装 LibraryService 暴露 save/list/get/remove；container 加 db_path 参数与 lazy library_service()；新增 application/paths.py（ndl_home + library_db_path），disclaimer 改用共享 helper；10 个新单测；总测试 99 passed，覆盖率 90.55%。下一步进入 P2.4 ndl library CLI）
+> 最后更新：2026-05-01（P3.5 Web Polish + Docs 完成：`docs/user-guide/README.md` 重写覆盖 library/serve/--no-save/NDL_HOME 状态布局；`docs/index.md` 与 `README.zh-CN.md` 同步 P2/P3 状态；Web UI 增加首页空态提示与下载任务结果块（输出路径 + 书库链接），无新增依赖；CHANGELOG/P3 plan 标注切片完成。下一步进入 P4 调度/更新）
 
 ---
 
@@ -28,6 +28,12 @@
 | **P2.1 存储基础** | `src/ndl/storage/`：engine 工厂（WAL + foreign_keys=ON PRAGMA）、`session_scope` 上下文管理器、SQLAlchemy 2.0 Mapped 模型 4 张表（`NovelRow` / `ChapterRow` / `DownloadJobRow` / `SettingRow`）；新依赖 `sqlalchemy>=2.0`；8 个新 unit test 覆盖 schema、PRAGMA、唯一约束、级联删除、settings KV、status check | 见 P2 plan §P2.1 |
 | **P2.2 LibraryRepository** | `src/ndl/storage/repository.py`：`LibraryRepository` 提供 save/list/get/remove；upsert 锚点 `(source_rule_id, source_url)`，章节替换走 `clear() + flush` 再 insert 避免 UNIQUE 冲突；list 走 `func.count` 单查询返回 `NovelSummary` 摘要；9 个新 unit test 覆盖 round-trip / upsert / 无 source_url 总插入 / list 计数 / 缺失返回 None / remove 级联 | 见 P2 plan §P2.2 |
 | **P2.3 LibraryService + 容器接线** | `src/ndl/application/services/library.py`：薄包装 `LibraryRepository`；`application/paths.py` 暴露 `ndl_home()` + `library_db_path()`，`cli/disclaimer.py` 改用共享 helper；`ServiceContainer` 加 `db_path` 参数 + 懒加载 `library_service()`（rules validate 等命令不会创建 `~/.ndl/`）；10 个新 unit test 覆盖 service 方法、paths 的 NDL_HOME override、container 单例 | 见 P2 plan §P2.3 |
+| **P2.4 Library CLI + download 入库** | `ndl library list/show/remove`；list/show 使用 Rich 表格，show 不展开正文；remove 支持 `--yes`；`ndl download` 成功写文件后默认 `library_service().save(novel)`，`--no-save` 保留文件-only 行为；CLI 测试通过 `NDL_HOME` 隔离 `library.db` | 见 P2 plan §P2.4 |
+| **P3.1 Web App Skeleton** | `src/ndl/web/`：FastAPI app factory、Jinja2 templates、static CSS；首页渲染本地书库 UI shell 并从 `LibraryService.list()` 读取摘要；新增 P3 runtime deps；TestClient 覆盖空库和种子库首页 | 见 P3 plan §P3.1 |
+| **P3.2 Read-only Library Views** | `GET /` 摘要行链接到详情；`GET /library/{id}` 显示小说元数据 + 章节标题/字数且不展示正文；缺失 ID 返回 404 error template；TestClient 覆盖列表链接、详情和缺失 ID | 见 P3 plan §P3.2 |
+| **P3.3 Download Form + Progress Channel** | 首页下载表单；`POST /downloads` URL-encoded 表单解析（不加 `python-multipart`）；FastAPI background task 复用下载/转换服务；输出默认写到 `NDL_HOME/downloads`；`JobRegistry` 记录进度并通过 SSE 输出；native EventSource 渲染进度 | 见 P3 plan §P3.3 |
+| **P3.4 `ndl serve` CLI** | `ndl serve` 启动本地 FastAPI Web UI；支持 `--host` / `--port` / `--reload` / `--accept-disclaimer` / `--allow-public-host`；默认 localhost，公共 bind 需显式确认；CliRunner 测试不启动真实 server | 见 P3 plan §P3.4 |
+| **P3.5 Web Polish + Docs** | `docs/user-guide/README.md` 重写覆盖 library/serve/--no-save 与 `<NDL_HOME>/{library.db,disclaimer.accepted,downloads/}` 状态布局；`docs/index.md`、`README.zh-CN.md` 同步 P2/P3 状态；Web UI 加首页空态提示和下载任务结果块（输出路径 + 书库链接） | 见 P3 plan §P3.5 |
 
 ### 当前活动 Plan
 
@@ -40,21 +46,93 @@
 - P1.5 ✅ implemented
 - P1.6 ✅ implemented
 
-当前活动计划：**`docs/superpowers/plans/2026-04-30-ndl-p2-library.md`** —— P2 书库持久化计划：
+已完成计划：**`docs/superpowers/plans/2026-04-30-ndl-p2-library.md`** —— P2 书库持久化计划：
 
 - P2.1 ✅ implemented — SQLite/SQLAlchemy 存储基础
 - P2.2 ✅ implemented — LibraryRepository（save/list/get/remove + Novel↔Row 双向映射）
 - P2.3 ✅ implemented — LibraryService + ServiceContainer.library_service()
-- **P2.4 ⏭ next** — `ndl library list/show/remove` CLI + download 默认入库 + `--no-save` 退出口
+- P2.4 ✅ implemented — `ndl library list/show/remove` CLI + download 默认入库 + `--no-save` 退出口
+
+当前活动计划：**`docs/superpowers/plans/2026-05-01-ndl-p3-web-ui.md`** —— P3 Web UI 计划：
+
+- P3.1 ✅ implemented — Web App Skeleton（依赖 + `src/ndl/web/` app factory/templates/static + `GET /` 测试）
+- P3.2 ✅ implemented — Read-only Library Views
+- P3.3 ✅ implemented — Download Form + Progress Channel
+- P3.4 ✅ implemented — `ndl serve` CLI
+- P3.5 ✅ implemented — Web Polish + Docs
 
 ### 质量门当前状态
 
 ```
 ruff check / format     ✅
-mypy --strict (42 文件) ✅
-pytest                  ✅ 99 passed
-coverage                ✅ 90.55%（fail_under=80）
+mypy --strict (45 文件) ✅
+pytest                  ✅ 112 passed
+coverage                ✅ 90.40%（fail_under=80）
 ```
+
+### 本轮（2026-05-01）P3.5 完成要点
+
+- `docs/user-guide/README.md` 重写：CLI 参考补齐 `ndl convert` / `ndl download --no-save` / `ndl library list/show/remove` / `ndl serve` 与 Web UI 走查；新增 `<NDL_HOME>/{library.db,disclaimer.accepted,downloads/}` 状态表
+- `docs/index.md` 状态行从 "P2 next" 同步到 "P3 Web UI core flow done, P3.5 polish in progress"，并把当前 capabilities 列表补齐 library / serve
+- `README.zh-CN.md` 与英文 README 对齐：P2 已完成、P3 在打磨；用法块加上 `ndl library list` 和 `ndl serve --accept-disclaimer`，把 `ndl update --all` 单独移到 P4+ 规划
+- `src/ndl/web/templates/index.html` 空态加一句操作引导（保留 "No saved novels" 字面，不破坏 TestClient 断言）
+- `src/ndl/web/templates/download_job.html` + `static/js/app.js` 新增 `data-job-result` 块；当 SSE `status` 事件返回 `succeeded` 时渲染输出路径 `code` 与 `/library/{novel_id}` 链接，`failed` 时显示 `error_message`；CSS 加 `.job-result` 样式
+- 不新增依赖；HTMX 仍未 vendored
+- CHANGELOG 加 P3.5 条目；P3 plan 标 P3.5 implemented
+
+### 本轮（2026-05-01）P3.4 完成要点
+
+- 新增 `ndl serve` CLI 命令，支持 `--host`、`--port`、`--reload`、`--accept-disclaimer`、`--allow-public-host`
+- 启动前复用 `ensure_download_disclaimer()`，首次未确认时与 `ndl download` 使用一致的用户提示/退出路径
+- 默认 bind 为 `127.0.0.1`；`0.0.0.0` 等非本地 bind 默认拒绝，必须显式加 `--allow-public-host`
+- `_run_web_server()` 封装 `uvicorn.run("ndl.web.app:create_app", factory=True, ...)`，便于 CLI 测试 monkeypatch，避免启动真实 server
+- CLI 测试新增 4 个用例，覆盖免责声明 gate、uvicorn 参数、公共 host 拒绝与显式允许
+
+### 本轮（2026-05-01）P3.3 完成要点
+
+- 首页新增下载表单：URL、格式（epub/txt）、Save checkbox
+- 新增 `src/ndl/web/jobs.py`，提供 in-memory `JobRegistry` 与 `DownloadJob`
+- 新增 `POST /downloads`，用 `FastAPI BackgroundTasks` 跑下载；表单用 stdlib `parse_qs` 解析，避免新增 `python-multipart`
+- Web 下载复用 `ServiceContainer.download()` + `ConvertService`；保存开启时调用 `library_service().save(novel)`，未勾选 Save 时跳过入库
+- 输出文件默认写到 `NDL_HOME/downloads`，测试通过 `create_app(output_dir=...)` 注入临时目录
+- 新增 `/downloads/{job_id}/events` SSE，输出 `ProgressEvent.model_dump_json()` 和最终 status event；前端用 native `EventSource`，HTMX 仍未 vendored
+- Web 测试扩展到 7 个：mocked HTTP 下载入库、no-save、不写正文、SSE progress/status、缺失 URL 400
+
+### 本轮（2026-05-01）P3.2 完成要点
+
+- `GET /` 继续使用 `LibraryService.list()` 摘要，不加载章节正文；列表标题链接到 `/library/{id}`
+- 新增 `GET /library/{id}`，渲染小说标题、作者、规则、来源 URL、抓取时间、章节标题和字数
+- 新增 `error.html`，缺失 ID 返回 HTTP 404，并以 `UserError.user_message()` 风格显示错误信息
+- `tests/unit/web/test_app.py` 扩展到 4 个测试：空库、列表链接、详情页不泄漏正文、缺失 ID 404
+
+### 本轮（2026-05-01）P3.1 完成要点
+
+- P3 runtime dependencies 写入 `pyproject.toml` / `uv.lock`：`fastapi`, `uvicorn[standard]`, `jinja2`, `sse-starlette`
+- 新增 `src/ndl/web/app.py`，`create_app(container=...)` 可注入测试容器，首页通过 `LibraryService.list()` 渲染本地库摘要
+- 新增 `src/ndl/web/templates/` 与 `src/ndl/web/static/css/app.css`，第一屏是书库工具界面，不做营销页
+- 新增 `tests/unit/web/test_app.py`，覆盖空库首页和种子库首页；不会展开章节正文
+
+### 本轮（2026-05-01）P3 计划创建要点
+
+- 新增 `docs/superpowers/plans/2026-05-01-ndl-p3-web-ui.md`
+- P3 依赖决策：`fastapi>=0.110`, `uvicorn[standard]>=0.27`, `jinja2>=3.1`, `sse-starlette>=2.0`
+- P3 切片顺序：Web skeleton → read-only library → download form + SSE progress → `ndl serve` → docs/polish
+- README 状态更新为 P2 已完成、P3 Web UI next，并把 `ndl library list` 移入当前可用命令
+
+### 本轮（2026-05-01）P2.4 完成要点
+
+**CLI 行为**
+
+- 新增 `library` Typer 子应用：`ndl library list` / `show <id>` / `remove <id>`
+- `list` 输出 `id / title / author / status / chapter_count / fetched_at`
+- `show` 输出小说头部信息和章节标题/字数，不输出章节正文
+- `remove` 使用 `LibraryService.remove()` 级联删除；`--yes` / `-y` 可跳过确认
+- `download` 在成功写出目标文件后默认保存下载得到的 `Novel`；`--no-save` 可关闭入库
+
+**测试**
+
+- `tests/unit/cli/test_main.py` 新增 `NDL_HOME=tmp_path/ndl-home` 隔离库覆盖
+- 覆盖 mocked HTTP 下载后自动保存、`--no-save` 空库、`library show` 不泄漏正文、`library remove --yes` 后列表为空
 
 ### 本轮（2026-04-30）审计修复要点
 
@@ -104,9 +182,9 @@ uv run pre-commit run --all-files
 
 ```
 1. Read docs/superpowers/SESSION-STATE.md（本文件）
-2. Read docs/superpowers/plans/2026-04-30-ndl-p2-library.md（活动 plan）
+2. Read docs/superpowers/plans/2026-05-01-ndl-p3-web-ui.md（活动 plan）
 3. Read AGENTS.md + docs/agents/issue-tracker.md（约定）
-4. 检查仓库状态：git log --oneline -10 + git status，确认本地工作区干净
+4. 检查仓库状态：git log --oneline -10 + git status，确认是否存在未提交切片变更
 5. 确认本文件 §1 的"已完成"列表与代码实际情况一致：
    - src/ndl/core/        ✅ P1.1
    - src/ndl/rules/       ✅ P1.1
@@ -114,10 +192,11 @@ uv run pre-commit run --all-files
    - src/ndl/fetchers/    ✅ P1.3
    - src/ndl/converters/  ✅ P1.4
    - src/ndl/application/ ✅ P1.5
-   - src/ndl/cli/         ✅ P1.6
-   - src/ndl/storage/     ✅ P2.1
+   - src/ndl/cli/         ✅ P1.6 + P2.4 library commands + P3.4 serve
+   - src/ndl/storage/     ✅ P2.1-P2.2
+   - src/ndl/web/         ✅ P3.1-P3.5
 6. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
-7. P2.3 已完成；下一步进入 P2.4 `ndl library` CLI + download 默认入库
+7. P3 全部已完成；下一步进入 P4 调度/更新（`ndl update --all`）
 8. 完成新切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
 ```
 
@@ -134,24 +213,66 @@ uv run pre-commit run --all-files
 
 ---
 
-## 3. 下一步（P2.4 `ndl library` CLI + download 默认入库）的预备信息
+## 3. 下一步（P3.5 Web Polish + Docs）的预备信息
 
-接手 agent 应按 `docs/superpowers/plans/2026-04-30-ndl-p2-library.md` 实施 P2.4。基础已经就绪：
+P2 书库持久化已经完成，P3.1-P3.4 Web UI 主功能与启动命令已完成。接手 agent 应按 `docs/superpowers/plans/2026-05-01-ndl-p3-web-ui.md` 实施 P3.5。设计路线图把 P3 定义为 `web` / Jinja2 + HTMX + SSE / `ndl serve`：
 
-- 应用层：`ServiceContainer.library_service()` 已暴露，DB 路径默认 `~/.ndl/library.db`，`db_path=...` 可被 CLI 测试覆盖（CliRunner 通过 `NDL_HOME` env 即可）
-- 仓储已经支持完整 CRUD；list 摘要、get 完整、remove 级联
+- P3 plan 已批准依赖：`fastapi>=0.110`, `uvicorn[standard]>=0.27`, `jinja2>=3.1`, `sse-starlette>=2.0`
+- 复用现有服务：`ServiceContainer.download()` / `convert_service()` / `library_service()`
+- 复用持久化：默认库路径 `~/.ndl/library.db`，测试可通过 `NDL_HOME` 隔离
+- 合规边界继续沿用：免责声明、robots.txt、限速/并发约束不可绕过
 
-P2.4 落地清单：
+P3.1 已落地清单：
+
+1. 更新 `pyproject.toml` runtime dependencies，加入 P3 已批准依赖
+2. 新建 `src/ndl/web/` package，包含 FastAPI app factory、templates、static 目录
+3. `GET /` 返回本地书库 UI shell（第一屏是实际工具界面，不做营销 landing）
+4. `tests/unit/web/` 使用 `TestClient` 覆盖 app factory 与首页 200
+5. 不启动 scheduler、不接真实网络、不做下载表单；这些留给 P3.2/P3.3
+
+P3.2 已落地清单：
+
+1. `GET /` 正式作为 read-only library list，保持 `LibraryService.list()` 摘要调用，不加载正文
+2. 新增 `GET /library/{id}`，显示小说元数据和章节列表，不展示章节正文
+3. 缺失 ID 返回用户可见 404 页面/模板，复用 `NDLError.user_message()` 风格，不暴露 traceback
+4. TestClient 用临时 DB seed 小说，覆盖列表、详情、缺失 ID
+5. 不做下载表单和 SSE；留给 P3.3
+
+P3.3 已落地清单：
+
+1. 首页增加下载表单：URL、输出格式、保存/不保存选择
+2. Web 下载仍通过 `ServiceContainer.download()` + `ConvertService`，保持 robots/rate-limit/disclaimer 约束
+3. 建一个最小 in-memory job registry/progress channel，将 `ProgressEvent` 序列化为 SSE
+4. 测试只用 mocked HTTP routes 和临时 DB，覆盖 web-triggered download 可保存到库
+5. 失败时返回用户可见错误，不暴露 traceback；不做调度/追更
+
+P3.4 落地清单：
+
+1. 新增 `ndl serve` CLI 命令：`--host`, `--port`, `--reload`, `--accept-disclaimer`
+2. 复用 `ensure_download_disclaimer()`；首次 `ndl serve` 未确认时应给出和 download 一致的退出码/提示
+3. 默认 host 为 `127.0.0.1`；公共 bind（如 `0.0.0.0`）需要明确处理，避免静默暴露
+4. 通过 `uvicorn` 启动 `ndl.web:create_app` 或等价 app factory
+5. CliRunner 测试覆盖免责声明 gate 和参数校验，不启动真实 server
+
+P3.5 下一步清单：
+
+1. 补齐 focused CSS，让 Web UI 保持本地工具风格：紧凑、可扫读、下载/书库区域清晰
+2. 更新 README 与 docs/user-guide 中的当前 CLI + Web 命令，反映 P2/P3 已落地能力
+3. 文档说明状态存储位置：`NDL_HOME`、`library.db`、免责声明 marker、Web 下载输出目录
+4. 保持无 Node/npm、无前端构建链；除非先更新 P3 plan，否则不新增依赖
+5. 跑完整质量门并更新 CHANGELOG、P3 plan、本文件
+
+P2.4 已落地清单：
 
 1. `ndl library list` — 表格输出 `id / title / author / status / chapter_count / fetched_at`
 2. `ndl library show <id>` — 显示头部信息 + 章节列表（不展开正文）
-3. `ndl library remove <id>` — 级联删除，需要 `--yes` 跳过确认
+3. `ndl library remove <id>` — 级联删除，`--yes` 跳过确认
 4. `ndl download` 默认在写完文件后调用 `library_service().save(novel)`，通过 `--no-save` 退出
-5. `CliRunner` 测试用 `NDL_HOME=tmp_path/.ndl` 隔离 DB
+5. `CliRunner` 测试用 `NDL_HOME=tmp_path/ndl-home` 隔离 DB
 
-注意：P2.3 把 export 方法刻意从 LibraryService 拿掉；CLI 直接 `library.get(id)` + `convert_service.convert(novel, output)` 组合即可。
+注意：P2.3 把 export 方法刻意从 LibraryService 拿掉；后续若做导出命令，CLI 直接 `library.get(id)` + `convert_service.convert(novel, output)` 组合即可。
 
-建议 P2 退出条件：
+P2 退出条件已满足：
 
 - 下载结果可持久化到本地 SQLite
 - `ndl library list/show/remove` 有 `CliRunner` 覆盖
@@ -176,10 +297,10 @@ P2.4 落地清单：
 尚未落地（P2 之后）：
 
 - ✅ 存储：SQLite + SQLAlchemy 2.0 Mapped style + WAL（P2.1 已落地，仓储/服务/CLI 在 P2.2–P2.4）
-- ⏳ Web：FastAPI + HTMX + Jinja2 + SSE（P5+ 阶段）
-- ⏳ 调度：APScheduler AsyncIO（P6 阶段）
+- ⏳ Web：FastAPI + Jinja2 + SSE 已落地到 P3.4；P3.5 docs/polish 待完成；HTMX 尚未使用
+- ⏳ 调度：APScheduler AsyncIO（P4 阶段）
 - ⏳ Playwright extras（P2+，按需）
-- ⏳ 日志：`structlog`（P2+）
+- ⏳ 日志：`structlog`（P5 阶段）
 - ⏳ i18n：`babel`（P5+）
 
 **伦理硬约束（不可协商）：**
@@ -220,7 +341,8 @@ P2.4 落地清单：
 │       ├── plans/
 │       │   ├── 2026-04-20-ndl-p0-scaffold.md         ← P0 计划（已完成）
 │       │   ├── 2026-04-29-ndl-p1-mvp.md              ← P1 计划（已完成）
-│       │   └── 2026-04-30-ndl-p2-library.md          ← 当前活动 plan
+│       │   ├── 2026-04-30-ndl-p2-library.md          ← P2 计划（已完成）
+│       │   └── 2026-05-01-ndl-p3-web-ui.md           ← 当前活动 plan
 │       └── specs/
 │           └── 2026-04-20-ndl-design.md              ← 设计基础（v0.1 全套）
 ├── pyproject.toml                                    ← 依赖与质量工具配置
@@ -231,8 +353,9 @@ P2.4 落地清单：
 │   ├── fetchers/    ✅ P1.3
 │   ├── converters/  ✅ P1.4
 │   ├── application/ ✅ P1.5
-│   ├── cli/         ✅ P1.6
-│   ├── storage/     ✅ P2.1
+│   ├── cli/         ✅ P1.6 + P2.4 library commands + P3.4 serve
+│   ├── storage/     ✅ P2.1-P2.2
+│   ├── web/         ✅ P3.1-P3.5
 │   └── builtin_rules/example_static.yaml             ← 测试用规则
 └── tests/
     ├── contract/                                     ← 端到端契约测试 + fixtures

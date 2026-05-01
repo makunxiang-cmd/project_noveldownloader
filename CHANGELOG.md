@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- P3.5 Web UI polish: empty-state hint pointing at the download form, and a result block on the download job page that renders the final output path and a link back to the saved library entry once the SSE stream emits the terminal status event
+- P3.5 documentation pass: `docs/user-guide/README.md` now documents the library and serve commands, web download flow, disclaimer marker, and the `<NDL_HOME>/{library.db,disclaimer.accepted,downloads/}` state layout; `docs/index.md` and `README.zh-CN.md` reflect P2/P3 progress
 - P3.4 `ndl serve` CLI with `--host`, `--port`, `--reload`, `--accept-disclaimer`, and `--allow-public-host`; defaults to localhost and refuses public binds unless explicitly allowed
 - P3.4 CLI tests covering the serve disclaimer gate, uvicorn wrapper arguments, and public-host validation without starting a real server
 - P3.3 Web download flow: homepage download form, URL-encoded form handling without `python-multipart`, in-memory download job registry, native EventSource progress rendering, and `/downloads/{job_id}/events` SSE endpoint
