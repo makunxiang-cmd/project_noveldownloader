@@ -10,7 +10,7 @@
 
 ## Status
 
-Under active development. P0 scaffold, P1 MVP download/convert, and P2 library persistence are implemented; P3 Web UI is next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, library management, and a local Web UI. See `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
+Under active development. P0 scaffold, P1 MVP download/convert, P2 library persistence, and P3 local Web UI are implemented; P4 update scheduling is next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, library management, and a local Web UI. See `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
 
 ## What Works Now
 

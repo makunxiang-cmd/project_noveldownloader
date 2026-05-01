@@ -2,17 +2,22 @@
 
 ## Current Status
 
-P0 and P1 are implemented. The project now has:
+P0 through P3 are implemented. The project now has:
 
 - Core domain models, protocols, progress events, and typed errors
 - YAML rule schema, selector DSL, loader, and resolver
 - HTTP fetcher with robots.txt, retry, rate-limit, and encoding policy
 - HTML index/chapter parsers and TXT reader
 - TXT/EPUB writers and writer registry
-- Download/convert application services and a lightweight service container
-- Typer CLI commands: `download`, `convert`, and `rules validate`
+- SQLite-backed library persistence (`src/ndl/storage/`), with `LibraryRepository`
+  and a `LibraryService` exposed through `ServiceContainer.library_service()`
+- Download/convert/library application services and a lightweight service container
+- Typer CLI commands: `download`, `convert`, `rules validate`,
+  `library list/show/remove`, and `serve`
+- Local FastAPI/Jinja2 Web UI under `src/ndl/web/`: homepage library list,
+  detail pages, download form, and an SSE progress channel
 
-P2 is next: SQLite-backed library persistence and `ndl library {list,show,remove}`.
+P4 is next: update scheduling (`ndl update --all`) backed by APScheduler.
 
 ## Development Workflow
 
@@ -36,8 +41,10 @@ All slices should keep these gates green.
 - `src/ndl/fetchers/`: HTTP fetching infrastructure
 - `src/ndl/parsers/`: HTML parsers and TXT reader
 - `src/ndl/converters/`: TXT/EPUB writers and writer registry
-- `src/ndl/application/`: download/convert services and dependency wiring
+- `src/ndl/storage/`: SQLAlchemy 2.0 models, engine factory, sessionmaker, and `LibraryRepository`
+- `src/ndl/application/`: download/convert/library services and dependency wiring
 - `src/ndl/cli/`: Typer command surface and disclaimer gate
+- `src/ndl/web/`: FastAPI app factory, Jinja2 templates, hand-written CSS, native EventSource JS, and the in-memory job registry
 - `tests/unit/`: mirrors source package structure
 - `tests/contract/`: bundled rule fixtures and contract tests
 
@@ -55,11 +62,7 @@ All slices should keep these gates green.
 Before starting new work, read:
 
 1. `docs/superpowers/SESSION-STATE.md`
-2. The active plan named there, currently `docs/superpowers/plans/2026-04-30-ndl-p2-library.md`
+2. The active plan named there (P2 and P3 plans are now both implemented; the next plan will land under `docs/superpowers/plans/` once P4 is scoped)
 3. `AGENTS.md`
 
-The P1 implementation commits are:
-
-- `b8d1c8a feat(p1): add core domain and rule foundation`
-- `98eba4e feat(p1): add parsers fetcher and converters`
-- `f0f5dbe feat(p1): add services and cli commands`
+`git log --oneline` is the authoritative record of completed work.

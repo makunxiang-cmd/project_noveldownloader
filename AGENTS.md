@@ -2,7 +2,7 @@
 
 ## Current handoff
 
-Before changing code, read `docs/superpowers/SESSION-STATE.md` and the active plan named there. As of the latest sync, P1 is complete and the next work is P2 library persistence.
+Before changing code, read `docs/superpowers/SESSION-STATE.md` and the active plan named there. As of the latest sync, P0 through P3 (scaffold, MVP download/convert, library persistence, local Web UI) are implemented; the next planned work is P4 update scheduling.
 
 ## Agent skills
 
