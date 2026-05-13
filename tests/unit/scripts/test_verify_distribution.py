@@ -20,8 +20,8 @@ main = verify_distribution.main
 
 
 def test_verify_distribution_accepts_complete_artifacts(tmp_path: Path, capsys) -> None:
-    wheel = tmp_path / "noveldownloader-0.1.0.dev0-py3-none-any.whl"
-    sdist = tmp_path / "noveldownloader-0.1.0.dev0.tar.gz"
+    wheel = tmp_path / "noveldownloader-0.1.0-py3-none-any.whl"
+    sdist = tmp_path / "noveldownloader-0.1.0.tar.gz"
     _write_wheel(wheel, members=REQUIRED_WHEEL_MEMBERS)
     _write_sdist(sdist, suffixes=REQUIRED_SDIST_SUFFIXES)
 
@@ -32,8 +32,8 @@ def test_verify_distribution_accepts_complete_artifacts(tmp_path: Path, capsys) 
 
 
 def test_verify_distribution_reports_missing_wheel_member(tmp_path: Path, capsys) -> None:
-    wheel = tmp_path / "noveldownloader-0.1.0.dev0-py3-none-any.whl"
-    sdist = tmp_path / "noveldownloader-0.1.0.dev0.tar.gz"
+    wheel = tmp_path / "noveldownloader-0.1.0-py3-none-any.whl"
+    sdist = tmp_path / "noveldownloader-0.1.0.tar.gz"
     members = REQUIRED_WHEEL_MEMBERS - {"ndl/web/static/js/app.js"}
     _write_wheel(wheel, members=members)
     _write_sdist(sdist, suffixes=REQUIRED_SDIST_SUFFIXES)
@@ -49,7 +49,7 @@ def _write_wheel(path: Path, *, members: set[str]) -> None:
         [
             "Metadata-Version: 2.4",
             "Name: noveldownloader",
-            "Version: 0.1.0.dev0",
+            "Version: 0.1.0",
             "Provides-Extra: browser",
             "Provides-Extra: dev",
             "Provides-Extra: docs",
@@ -60,7 +60,7 @@ def _write_wheel(path: Path, *, members: set[str]) -> None:
     with zipfile.ZipFile(path, mode="w") as archive:
         for member in members:
             archive.writestr(member, "")
-        archive.writestr("noveldownloader-0.1.0.dev0.dist-info/METADATA", metadata)
+        archive.writestr("noveldownloader-0.1.0.dist-info/METADATA", metadata)
 
 
 def _write_sdist(path: Path, *, suffixes: set[str]) -> None:
@@ -68,4 +68,4 @@ def _write_sdist(path: Path, *, suffixes: set[str]) -> None:
         for suffix in suffixes:
             temp = path.parent / suffix.replace("/", "_")
             temp.write_text("", encoding="utf-8")
-            archive.add(temp, arcname=f"noveldownloader-0.1.0.dev0/{suffix}")
+            archive.add(temp, arcname=f"noveldownloader-0.1.0/{suffix}")

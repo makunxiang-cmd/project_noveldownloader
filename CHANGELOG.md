@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-05-13
+
 ### Changed
 
 - PyPI distribution name renamed from `ndl` to **`noveldownloader`**: the original `ndl` PyPI name has been registered since 2016 by an unrelated abandoned project (`msull/needle`). The Python import path (`from ndl...`) and the CLI entry point (`ndl ...`) are unchanged. After v0.1 ships, users install with `pip install noveldownloader` and `pip install 'noveldownloader[browser]'`. All in-repo docs, error messages, release notes, and tests are updated; `uv.lock` regenerated; built wheel/sdist verified end-to-end via `scripts/verify_distribution.py` + a clean-venv `scripts/smoke_cli.py`.
