@@ -1,8 +1,13 @@
 # NDL P7 Release Candidate Verification Plan
 
-> Status: active. P7 starts after completed P6 browser/release-hardening work.
+> Status: implemented (P7.1-P7.4 all done). The plan now holds a complete
+> record of the v0.1 release-candidate verification scaffolding. The
+> publication itself is intentionally gated on maintainer approval.
 >
-> Handoff note, 2026-05-13: P7.1 is implemented. Do not publish, tag, or bump the package version without explicit maintainer approval.
+> Handoff note, 2026-05-13: P7.1 distribution verifier, P7.2 release notes
+> draft, P7.3 install smoke, and P7.4 execution gate documentation are all
+> implemented. Do not publish, tag, or bump the package version without
+> explicit maintainer approval.
 
 ## Goal
 
@@ -95,16 +100,28 @@ Exit criteria:
 
 ### P7.4 Release Execution Gate
 
-Status: planned.
+Status: implemented.
 
 Scope:
 
 - Document explicit maintainer approval required for version bump, tag, GitHub release, and PyPI upload
 - Leave publication credentials and upload outside automated agent work
 
+Output:
+
+- `docs/developer/release.md` now contains an explicit "Execution Gate"
+  table that splits actions into "anyone" (preflight, build, verifier,
+  smoke) vs "maintainer only" (version bump, CHANGELOG dated heading,
+  release commit, tag, push, GitHub Release, PyPI upload).
+- A short maintainer runbook spells out the eleven steps in order.
+- Explicit instruction that agents must stop at the gate regardless of how
+  a request is phrased; the relevant runbook step is the appropriate reply.
+
 Exit criteria:
 
-- No release-mutating action is implied by the verification workflow
+- ✅ No release-mutating action is implied by the verification workflow.
+- ✅ The boundary between agent-safe checks and maintainer-only execution
+  is unambiguous in the release runbook.
 
 ## Quality Gates
 

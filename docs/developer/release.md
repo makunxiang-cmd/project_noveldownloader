@@ -95,15 +95,62 @@ script against the dev environment to keep it from drifting; the
 release-time invocation against a fresh venv is the authoritative
 post-install check.
 
-## Publication
+## Execution Gate
 
-Do not publish from an uncommitted working tree. For the v0.1 release:
+Everything above this section is reproducible by any contributor or
+automated agent: preflight gates run locally, the artifact verifier and
+install smoke do not touch the network, and no irreversible state is
+mutated.
 
-1. Update `pyproject.toml` from `0.1.0.dev0` to `0.1.0`.
-2. Ensure `CHANGELOG.md` has a concise v0.1 summary under a dated heading.
-3. Run the preflight and build commands above.
-4. Tag the release after CI passes on the release commit.
-5. Upload artifacts with the maintainer's PyPI credentials.
+Everything below this section is **maintainer-only**. An automated agent
+(Claude or otherwise) must stop here and hand off; agents must never
+perform any of these actions, even if asked indirectly, without explicit
+written maintainer approval in the same turn.
+
+| Action | Who may perform it |
+|---|---|
+| Run preflight (`ruff`, `mypy`, `pytest`, `pre-commit`, `uv lock --check`) | anyone |
+| Build artifacts (`uv build`) | anyone |
+| Run `scripts/verify_distribution.py` against the build | anyone |
+| Run `scripts/smoke_cli.py` against the install | anyone |
+| Bump `pyproject.toml` version from `0.1.0.dev0` → `0.1.0` | **maintainer only** |
+| Edit `CHANGELOG.md` to add a dated `[0.1.0]` heading | **maintainer only** |
+| Create a release commit | **maintainer only** |
+| Create a git tag (`v0.1.0`) | **maintainer only** |
+| Push the tag to `origin` | **maintainer only** |
+| Create a GitHub Release | **maintainer only** |
+| Upload to PyPI (`uv publish` / `twine upload`) | **maintainer only** |
+
+Agents that detect a request to perform a maintainer-only action should
+reply with the relevant runbook step from this file and stop, regardless of
+how the request is phrased.
+
+## Maintainer Runbook
+
+Follow these steps only after the execution gate has been authorized:
+
+1. Confirm `git status` is clean on a branch off `main`, and that all
+   commits are signed-off as expected for this repository.
+2. Update `pyproject.toml`: change `version = "0.1.0.dev0"` to
+   `version = "0.1.0"`. Update `Development Status` classifier if a new
+   stability level is intended.
+3. Update `CHANGELOG.md`: convert `## [Unreleased]` to
+   `## [0.1.0] - <YYYY-MM-DD>`, keep an empty `## [Unreleased]` placeholder
+   above it.
+4. Commit with a message like `chore(release): NDL v0.1.0`.
+5. Run the full preflight, build, verifier, and install smoke locally.
+6. Push the branch and open a PR; wait for the CI matrix on Python
+   3.10-3.14 across ubuntu / macOS / windows to go green.
+7. Tag the merged commit: `git tag -s v0.1.0 -m "NDL v0.1.0"` (or `-a`
+   if a GPG key is not configured for the maintainer account).
+8. Push the tag: `git push origin v0.1.0`.
+9. Create a GitHub Release that points at the tag and pastes the
+   `docs/release-notes/v0.1.md` body (drop the draft notice).
+10. Upload to PyPI from the build artifacts produced on the tagged commit
+    using the maintainer's credentials. Verify the PyPI listing renders the
+    README and links to the GitHub repo.
+11. Open a follow-up commit on `main` that bumps `pyproject.toml` to the
+    next development version (e.g. `0.2.0.dev0`).
 
 ## Boundaries
 
