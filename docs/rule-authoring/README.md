@@ -1,6 +1,6 @@
 # Rule Authoring Guide
 
-P1 includes the rule schema, selector DSL, loader/resolver, bundled `example_static` rule, and `ndl rules validate`.
+The rule schema, selector DSL, loader/resolver, bundled `example_static` rule, `ndl rules validate`, rule-defined search, remote rule installation, and P6 optional browser controls are implemented.
 
 ## Validate A Rule
 
@@ -15,12 +15,44 @@ Validation loads the YAML file through the same Pydantic schema used by the appl
 Rules describe:
 
 - URL patterns used by `RuleResolver`
-- Fetcher policy: headers, encoding, retries, robots.txt, and rate limits
+- Fetcher policy: HTTP/browser mode, headers, encoding, retries, robots.txt, and rate limits
+- Browser controls for rules using `fetcher.type: browser`
 - Index selectors for title, author, summary, cover, status, and chapter list
 - Chapter selectors for title and cleaned content
-- Optional pagination shape, currently fixture-backed in P1
+- Search endpoint selectors and optional pagination shape
 
-Use `src/ndl/builtin_rules/example_static.yaml` as the canonical P1 example.
+Use `src/ndl/builtin_rules/example_static.yaml` as the canonical static HTML example.
+
+## Browser Fetcher Controls
+
+Browser-backed rules require installing the optional browser extra and Chromium:
+
+```bash
+uv sync --extra browser
+uv run playwright install chromium
+uv run ndl doctor browser
+```
+
+Rules opt in explicitly:
+
+```yaml
+fetcher:
+  type: browser
+  browser:
+    navigation_timeout_ms: 30000
+    wait_until: networkidle
+    wait_for_selector: "#chapter-content"
+    extra_wait_ms: 0
+    viewport:
+      width: 1280
+      height: 900
+    javascript_enabled: true
+```
+
+Allowed `wait_until` values are `commit`, `domcontentloaded`, `load`, and
+`networkidle`. Browser rules still respect robots.txt, per-host rate limits,
+and retry policy. They are only for compliant public-domain JavaScript-rendered
+pages, not login, CAPTCHA, paywall, or Cloudflare challenge bypass.
 
 ## Selector Behavior
 

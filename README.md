@@ -10,7 +10,7 @@
 
 ## Status
 
-Under active development. P0 scaffold, P1 MVP download/convert, P2 library persistence, P3 local Web UI, and P4 library updates are implemented; P5 search and remote rule management are next. First release (v0.1) targets MVP features: download, TXT/EPUB convert, library management, and a local Web UI. See `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
+Under active development. P0-P6 are implemented, and P7.1 added repeatable release-candidate distribution verification. First release (v0.1) targets MVP features: download, TXT/EPUB convert, library management, search, rule updates, optional browser rendering for supported rules, local Web UI, and auditable packaging checks. See `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
 
 ## What Works Now
 
@@ -19,7 +19,11 @@ Under active development. P0 scaffold, P1 MVP download/convert, P2 library persi
 - Convert local TXT files to TXT or EPUB
 - Manage the local SQLite library with `ndl library list/show/remove`
 - Refresh saved ongoing novels with `ndl update --all`
-- Trigger manual and recurring library updates from the local Web UI
+- Search rule-defined source indexes with `ndl search`
+- Install validated remote YAML rules with `ndl rules update`
+- Use optional Playwright-backed rendering when a rule declares `fetcher.type: browser`, including rule-defined wait/viewport controls
+- Verify release-candidate wheel/sdist contents with `scripts/verify_distribution.py`
+- Search, download, and trigger manual/recurring library updates from the local Web UI
 - Enforce robots.txt, per-host rate limits, retries, and a first-run lawful-use disclaimer for downloads
 
 ## What It Does (Roadmap)
@@ -48,6 +52,14 @@ uv sync
 uv run ndl --version
 ```
 
+Optional browser-backed rules require the browser extra and a Playwright browser install:
+
+```bash
+uv sync --extra browser
+uv run playwright install chromium
+uv run ndl doctor browser
+```
+
 The package has not been released to PyPI yet.
 
 ## Usage
@@ -57,6 +69,9 @@ ndl download <url> -o book.epub --accept-disclaimer
 ndl convert book.txt -o book.epub
 ndl library list
 ndl update --all --accept-disclaimer
+ndl search "keyword"
+ndl rules update --manifest-url <manifest-url>
+ndl doctor browser
 ndl serve --accept-disclaimer
 ndl rules validate my-rule.yaml
 ```

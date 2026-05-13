@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Only the latest minor release on PyPI receives security fixes. Pre-release versions (0.x) may not be maintained once a newer 0.y is published.
+NDL has not been published to PyPI yet. Until the first public release, security fixes apply to the active repository state on `main`. After publication, only the latest minor release on PyPI receives security fixes; older pre-release versions (0.x) may not be maintained once a newer 0.y is published.
 
 ## Reporting a Vulnerability
 

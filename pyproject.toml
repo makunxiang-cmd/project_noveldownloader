@@ -16,6 +16,8 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Internet :: WWW/HTTP",
   "Topic :: Text Processing :: Markup",
 ]
@@ -36,6 +38,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+browser = [
+  "playwright>=1.40",
+]
 dev = [
   "mypy>=1.8",
   "pre-commit>=3.6",
@@ -113,7 +118,7 @@ show_error_codes = true
 files = ["src/ndl"]
 
 [[tool.mypy.overrides]]
-module = ["apscheduler.*", "ebooklib"]
+module = ["apscheduler.*", "ebooklib", "playwright.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

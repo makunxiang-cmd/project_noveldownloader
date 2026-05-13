@@ -10,10 +10,11 @@ cd project_noveldownloader
 
 uv sync --all-extras
 
-uv run pytest
 uv run ruff check .
-uv run ruff format .
+uv run ruff format --check .
 uv run mypy src/ndl
+uv run pytest --cov=ndl --cov-report=term --cov-report=xml
+uv run pre-commit run --all-files
 uv run pre-commit install
 ```
 
@@ -24,7 +25,7 @@ uv run pre-commit install
 NDL is rule-driven. Adding support for a new site does not require writing Python.
 
 1. Fork the repo
-2. Create a YAML rule under `src/ndl/builtin_rules/<your_site>.yaml` for PRs, or `~/.ndl/rules/custom/` for personal use
+2. Create a YAML rule under `src/ndl/builtin_rules/<your_site>.yaml` for PRs, or `<NDL_HOME>/rules/<your_site>.yaml` for personal use
 3. Add a contract test fixture under `tests/contract/fixtures/<rule_id>/` containing `index.html`, `chapter.html`, `expected.json`
 4. Run `uv run pytest tests/contract/ -k <rule_id>`
 5. Submit a PR
@@ -60,7 +61,7 @@ Open a feature request issue and describe:
 - Formatting: `ruff format`
 - Linting: `ruff check`
 - Typing: `mypy --strict` on `src/ndl`
-- Testing: `pytest`; aim for 80%+ coverage, 90%+ on `core/`, `rules/`, `converters/`
+- Testing: `pytest --cov=ndl --cov-report=term --cov-report=xml`; keep project coverage above the configured 80% floor
 - Commits: Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`)
 
 ## License
