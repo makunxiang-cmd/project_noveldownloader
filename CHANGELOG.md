@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release notes are no longer marked draft, README/user docs now point at the
   live `pip install ndl-storykit` flow, and handoff docs record the v0.1.0
   GitHub/PyPI publication.
+- Public documentation status refreshed after the v0.1.0 release: README,
+  MkDocs home, developer guide, release runbook, and public design-spec note
+  now describe the published `ndl-storykit` package and the active
+  `0.2.0.dev0` development cycle instead of the earlier P7 release-candidate
+  state.
 
 ## [0.1.0] - 2026-05-13
 

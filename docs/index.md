@@ -2,7 +2,13 @@
 
 Welcome to the NDL documentation.
 
-**Status:** Under active development. P0-P6 are implemented, covering scaffold, MVP download/convert, library persistence, local Web UI, updates, search, remote rule updates, optional browser rendering, diagnostics, and release hardening. P7.1 added repeatable release-candidate wheel/sdist verification. Agent handoff state is tracked in `superpowers/SESSION-STATE.md`.
+**Status:** v0.1.0 is published on PyPI as `ndl-storykit`, and the current
+source tree is back on `0.2.0.dev0` for the next development cycle. P0-P7 are
+implemented, covering scaffold, MVP download/convert, library persistence,
+local Web UI, updates, search, remote rule updates, optional browser rendering,
+diagnostics, release hardening, release notes, install smoke checks, and
+repeatable wheel/sdist verification. Agent handoff state is tracked in
+`superpowers/SESSION-STATE.md`.
 
 ## Current Capabilities
 
@@ -16,18 +22,21 @@ Welcome to the NDL documentation.
 - `ndl doctor browser` checks the optional Playwright/Chromium runtime for browser-backed rules.
 - `ndl serve --accept-disclaimer` starts the local FastAPI/Jinja2 Web UI on `127.0.0.1`, supports search, Web-triggered downloads, manual update-all, and recurring updates by default.
 - Downloads honor the bundled rule's robots.txt, rate-limit, retry, and encoding policies.
-- Rules may opt into optional Playwright rendering with `fetcher.type: browser` when installed with `ndl[browser]`, including declarative wait/viewport controls.
+- Rules may opt into optional Playwright rendering with `fetcher.type: browser`
+  when installed with `ndl-storykit[browser]`, including declarative
+  wait/viewport controls.
 
-## Next Milestone
+## Current Development
 
-P6 is complete and P7 is active. P7.1 added repeatable wheel/sdist verification for release-candidate artifacts. See the handoff snapshot under `superpowers/SESSION-STATE.md`.
+The first public release is complete. The next milestone is `0.2.0` planning
+and implementation on top of the published v0.1 baseline.
 
 ## Sections
 
 - [User Guide](user-guide/README.md) - installation, CLI reference, Web UI walkthrough, configuration
 - [Rule Authoring](rule-authoring/README.md) - writing YAML rules to support new sites
 - [Developer](developer/README.md) - architecture, contribution workflow, rule contract tests
-- [Release Checklist](developer/release.md) - v0.1 preflight, artifact inspection, and publication steps
+- [Release Checklist](developer/release.md) - release preflight, artifact inspection, install smoke, and maintainer-only publication steps
 
 ## See Also
 
