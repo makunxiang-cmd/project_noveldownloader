@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Post-release housekeeping: development version advanced to `0.2.0.dev0`,
+  release notes are no longer marked draft, README/user docs now point at the
+  live `pip install ndl-storykit` flow, and handoff docs record the v0.1.0
+  GitHub/PyPI publication.
+
 ## [0.1.0] - 2026-05-13
 
 ### Changed
@@ -27,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - P7.4 release execution gate documentation: `docs/developer/release.md` gains an explicit "Execution Gate" section with an actions table (anyone vs maintainer-only) and an 11-step Maintainer Runbook for v0.1.0 (version bump, dated CHANGELOG heading, release commit, tag, push, GitHub Release, PyPI upload). The doc states that automated agents must stop at the gate and reply with the relevant runbook step regardless of how a release-mutating request is phrased.
 - P7.3 post-install smoke: new `scripts/smoke_cli.py` exercises `ndl --version`, `ndl rules list`, `ndl rules validate <bundled rule>`, and `ndl doctor browser` (with `--browser` to assert the runtime is wired up) against any environment where the `ndl` entry point resolves. No real network calls. `tests/unit/scripts/test_smoke_cli.py` runs the smoke against the dev environment to keep the contract from drifting. `docs/developer/release.md` documents the release-time invocation against a clean venv plus the optional browser smoke command.
-- P7.2 release notes draft at `docs/release-notes/v0.1.md`, plus a `Release Notes → v0.1 (Draft)` nav entry in `docs/mkdocs.yml`. Single-page user-facing summary of v0.1 with highlights, compliance boundaries, quick start, reliability hardening, what's-not-included, quality snapshot, and the maintainer-only execution gate.
+- P7.2 release notes page at `docs/release-notes/v0.1.md`, plus a `Release Notes → v0.1` nav entry in `docs/mkdocs.yml`. Single-page user-facing summary of v0.1 with highlights, compliance boundaries, quick start, reliability hardening, what's-not-included, quality snapshot, and the maintainer-only execution gate.
 - `ndl rules list` CLI command renders a Rich table of all loaded rules (id / name / version / enabled / search / fetcher type / pattern count). Closes the documentation gap referenced by `RuleNotFoundError`'s "Try `ndl rules list`" hint.
 - `RuleUpdateService` now requires `https` for both the manifest URL and every resolved rule URL by default; set `NDL_RULES_ALLOW_INSECURE=1` to allow `http` for local mirrors or testing.
 

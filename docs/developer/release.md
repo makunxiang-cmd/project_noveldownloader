@@ -1,12 +1,12 @@
 # Release Checklist
 
-NDL is still pre-release. Keep `0.1.0.dev0` until a maintainer explicitly chooses
-the v0.1 tag and PyPI publication date.
+NDL v0.1.0 is published on PyPI as `ndl-storykit`. Keep the active development
+version on a `.dev0` suffix until the next release.
 
 ## Version Decision
 
-- Current package version: `0.1.0.dev0`
-- First public release target: `0.1.0`
+- Current package version: `0.2.0.dev0`
+- Latest public release: `0.1.0`
 - Version bump should happen in a dedicated release commit after P7 release-candidate
   gates are green and release notes are reviewed.
 
