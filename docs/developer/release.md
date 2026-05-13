@@ -60,6 +60,41 @@ Prefer the automated verifier for repeatable release-candidate checks:
 uv run python scripts/verify_distribution.py dist/ndl-*.whl dist/ndl-*.tar.gz
 ```
 
+## Install Smoke
+
+After `verify_distribution.py` passes, prove the wheel actually executes by
+installing it into a clean environment and running the post-install CLI
+smoke. The smoke never touches the network:
+
+```bash
+# Required: install the wheel into an isolated venv
+python -m venv /tmp/ndl-smoke
+/tmp/ndl-smoke/bin/pip install --upgrade pip
+/tmp/ndl-smoke/bin/pip install dist/ndl-*.whl
+
+# Run the smoke (validates --version, rules list, rules validate, doctor browser diagnostic)
+/tmp/ndl-smoke/bin/python scripts/smoke_cli.py --ndl /tmp/ndl-smoke/bin/ndl
+```
+
+Optional browser smoke (slower; downloads Chromium on first run):
+
+```bash
+/tmp/ndl-smoke/bin/pip install 'dist/ndl-*.whl[browser]'
+/tmp/ndl-smoke/bin/playwright install chromium
+/tmp/ndl-smoke/bin/python scripts/smoke_cli.py --ndl /tmp/ndl-smoke/bin/ndl --browser
+```
+
+In the dev tree the same script can run against the active venv:
+
+```bash
+uv run python scripts/smoke_cli.py --ndl "$(which ndl)"
+```
+
+A unit test (`tests/unit/scripts/test_smoke_cli.py`) exercises the smoke
+script against the dev environment to keep it from drifting; the
+release-time invocation against a fresh venv is the authoritative
+post-install check.
+
 ## Publication
 
 Do not publish from an uncommitted working tree. For the v0.1 release:

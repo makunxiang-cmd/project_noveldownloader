@@ -65,7 +65,7 @@ Exit criteria:
 
 ### P7.3 Install Smoke Strategy
 
-Status: planned.
+Status: implemented.
 
 Scope:
 
@@ -73,9 +73,25 @@ Scope:
 - Prefer wheel metadata/content validation plus CLI smoke in an environment with dependencies already synced
 - Document when optional browser smoke is expected
 
+Output:
+
+- `scripts/smoke_cli.py` runs four CLI checks against any environment where
+  the `ndl` entry point resolves: `ndl --version`, `ndl rules list`,
+  `ndl rules validate <bundled rule>`, and `ndl doctor browser` (diagnostic
+  by default; assertion under `--browser`). No real network calls.
+- `tests/unit/scripts/test_smoke_cli.py` runs the script against the dev
+  environment so the smoke contract stays green in CI alongside the rest of
+  the test suite. The release-time invocation against a fresh venv remains
+  the authoritative post-install check.
+- `docs/developer/release.md` documents the install smoke between the
+  artifact verifier and the publication step, including the optional browser
+  smoke command.
+
 Exit criteria:
 
-- Release checklist has an unambiguous local smoke path
+- ✅ Release checklist has an unambiguous local smoke path that does not
+  rely on real network.
+- ✅ Optional browser smoke is documented as a separate, slower step.
 
 ### P7.4 Release Execution Gate
 
