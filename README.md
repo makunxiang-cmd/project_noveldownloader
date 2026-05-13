@@ -10,7 +10,12 @@
 
 ## Status
 
-Under active development. P0-P6 are implemented, and P7.1 added repeatable release-candidate distribution verification. First release (v0.1) targets MVP features: download, TXT/EPUB convert, library management, search, rule updates, optional browser rendering for supported rules, local Web UI, and auditable packaging checks. See `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
+v0.1.0 is published on PyPI as `ndl-storykit`. The current source tree is back
+on the next development version, `0.2.0.dev0`, after shipping the first public
+release. Implemented surfaces include download, TXT/EPUB convert, library
+management, search, rule updates, optional browser rendering for supported
+rules, local Web UI, and auditable packaging checks. See
+`docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
 
 ## What Works Now
 
@@ -22,7 +27,7 @@ Under active development. P0-P6 are implemented, and P7.1 added repeatable relea
 - Search rule-defined source indexes with `ndl search`
 - Install validated remote YAML rules with `ndl rules update`
 - Use optional Playwright-backed rendering when a rule declares `fetcher.type: browser`, including rule-defined wait/viewport controls
-- Verify release-candidate wheel/sdist contents with `scripts/verify_distribution.py`
+- Verify release wheel/sdist contents with `scripts/verify_distribution.py`
 - Search, download, and trigger manual/recurring library updates from the local Web UI
 - Enforce robots.txt, per-host rate limits, retries, and a first-run lawful-use disclaimer for downloads
 

@@ -7,11 +7,16 @@
 | 仓库 | `github.com/makunxiang-cmd/project_noveldownloader` |
 | Python 包名 | `ndl` |
 | 文档日期 | 2026-04-20 |
-| 文档状态 | 待审核（Draft）|
+| 文档状态 | Historical design snapshot |
 | License | MIT |
 | 设计文档版本 | 1.0 |
 
-> Implementation status, 2026-05-13: P0 through P6 are implemented, covering scaffold, download/convert MVP, library persistence, local Web UI, update scheduling, rule-defined search, remote rule updates, Web search, optional browser rendering, browser diagnostics, and release hardening. P7.1 distribution verification is implemented; for current handoff state, read `docs/superpowers/SESSION-STATE.md`.
+> Historical note, 2026-05-13: this document records the original design
+> direction from April 2026. The implementation has since shipped v0.1.0 on
+> PyPI as `ndl-storykit`, and the source tree is on `0.2.0.dev0` for the next
+> development cycle. Treat older package/version examples below as design
+> history; use the home page, user guide, developer guide, and
+> `docs/superpowers/SESSION-STATE.md` for current status.
 
 ---
 
@@ -35,7 +40,7 @@ NDL 是一个以 **Python 3.10+** 为基础的**中文小说下载与格式转�
 | 1 | 交互方式 | CLI + 本地 Web UI | 兼顾终端用户与非技术用户；Web UI 跨设备访问 |
 | 2 | 目标站点 | 纯规则驱动（YAML），不硬编码任何站点 | 开源可持续：社区零代码贡献新源 |
 | 3 | 输出格式 | TXT + EPUB；`ndl convert` 独立子命令 | 中文电子书事实标准；PDF/MOBI 后续 PR |
-| 4 | JavaScript 渲染 | HTTP 默认；Playwright 作为 `ndl[browser]` 可选 extras | 降低首装门槛，保留高级能力 |
+| 4 | JavaScript 渲染 | HTTP 默认；Playwright 作为 `ndl-storykit[browser]` 可选 extras | 降低首装门槛，保留高级能力 |
 | 5 | 状态管理 | SQLite + 追更功能，`NDL_HOME` 路径 helper | Web UI 前提；连载小说刚需 |
 | 6a | Web 前端 | Jinja2 + SSE + 少量原生 JavaScript | 纯 Python 栈，零 Node.js 构建 |
 | 6b | 追更触发 | APScheduler 随 `ndl serve` 运行 + 手动 `ndl update` | 无守护进程负担 |
@@ -523,7 +528,7 @@ project_noveldownloader/
 > - **P4 已落地**：`apscheduler`（追更调度）
 > - **P5 已落地**：搜索与远程规则更新未新增 `structlog` / `babel`
 > - **P6 已落地**：`playwright`（可选 `browser` extra）
-> - **P7.1 已落地**：`scripts/verify_distribution.py` 使用 stdlib，无新增依赖
+> - **P7 已落地**：distribution verifier、release notes、install smoke、release execution gate，无新增 runtime 依赖
 > - **仍未引入**：`structlog`, `babel`, `platformdirs`, `tenacity`, `aiolimiter`, `protego`, `pydantic-settings`, `lxml`, `aiosqlite`, `alembic`
 >
 > 以下清单按"加入时机"在 §9 路线图行内重申。新增任何依赖必须在对应 P 阶段 plan 中显式批准。
@@ -619,15 +624,15 @@ build-backend = "hatchling.build"
 |---|---|---|---|
 | **P0 脚手架** | 目录结构 + `pyproject.toml` + CI + LICENSE + 空 CLI | 1-2 天 | `ndl --version` 工作；CI 全绿 |
 | **P1 MVP：下载 + 转换** | `core` / `rules` / `fetchers(http)` / `parsers` / `converters` / `services(download+convert)` / `cli(download+convert)` + 合规 fixture 内置规则 + 契约测试 | 已完成 | `ndl download <url> -o book.epub` 端到端工作 |
-| **P2 书库持久化** | `storage` / `services(library)` / `cli(library)` | 1 周 | 下载自动入库；`ndl library {list,show,remove}` |
+| **P2 书库持久化** | `storage` / `services(library)` / `cli(library)` | 已完成 | 下载自动入库；`ndl library {list,show,remove}` |
 | **P3 Web UI** | `web` / Jinja2 + SSE + native JS / `ndl serve` | 已完成 | `localhost:8000` 可用 |
-| **P4 追更** | `scheduler` / `services(update)` / CLI+Web 触发入口 | 1 周 | APScheduler 定时 + 手动双通道 |
-| **P5 搜索 + 远程规则** | `services(search)` / `rules/remote` / CLI 新命令 | 1 周 | `ndl search "关键词"` / `ndl rules update` |
-| **P6 浏览器 Fetcher + 发布准备** | `fetchers/browser` / rule controls / diagnostics / release checklist | 已完成 | `pip install ndl[browser]` + `ndl doctor browser` |
-| **P7 Release Candidate Verification** | wheel/sdist verifier / release notes / install smoke strategy / release execution gate | P7.1 已完成，P7.2-P7.4 计划中 | 可重复构建并校验 release-candidate artifacts，不自动发布 |
-| **P8+ v1.0** | Docker 镜像 / 更多内置规则 / UX 打磨 / 批量导出 / i18n | 持续 | Docker Hub + v1.0 tag |
+| **P4 追更** | `scheduler` / `services(update)` / CLI+Web 触发入口 | 已完成 | APScheduler 定时 + 手动双通道 |
+| **P5 搜索 + 远程规则** | `services(search)` / `rules/remote` / CLI 新命令 | 已完成 | `ndl search "关键词"` / `ndl rules update` |
+| **P6 浏览器 Fetcher + 发布准备** | `fetchers/browser` / rule controls / diagnostics / release checklist | 已完成 | `pip install 'ndl-storykit[browser]'` + `ndl doctor browser` |
+| **P7 Release Candidate Verification** | wheel/sdist verifier / release notes / install smoke strategy / release execution gate | 已完成 | 可重复构建并校验 release artifacts；v0.1.0 已由 maintainer 发布 |
+| **P8+ / 0.2+** | Docker 镜像 / 更多内置规则 / UX 打磨 / 批量导出 / i18n | 持续 | 后续版本规划 |
 
-**MVP 功能已基本落地；PyPI 发布仍等待 P7 release-candidate verification 完成与 maintainer 明确批准。**
+**MVP 功能已随 v0.1.0 发布到 PyPI，发行名为 `ndl-storykit`。当前源码版本为 `0.2.0.dev0`。**
 
 ### 9.1 MVP (v0.1) vs v1.0 能力对照
 

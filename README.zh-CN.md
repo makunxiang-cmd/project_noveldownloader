@@ -10,7 +10,10 @@
 
 ## 项目状态
 
-开发中。P0-P6 已实现，P7.1 增加了可重复的 release-candidate 发行包校验。首发版本 v0.1 目标：下载、TXT/EPUB 转换、书库管理、搜索、规则更新、支持规则选择的可选浏览器渲染、本地 Web UI，以及可审计的打包校验。当前接手快照见 `docs/superpowers/SESSION-STATE.md`。
+v0.1.0 已发布到 PyPI，发行名为 `ndl-storykit`。当前源码已经回到下一轮开发版本
+`0.2.0.dev0`。已实现范围包括：下载、TXT/EPUB 转换、书库管理、搜索、规则更新、
+支持规则选择的可选浏览器渲染、本地 Web UI，以及可审计的打包校验。当前接手快照见
+`docs/superpowers/SESSION-STATE.md`。
 
 ## 当前可用
 
@@ -22,7 +25,7 @@
 - 通过 `ndl search` 搜索规则文件声明的来源索引
 - 通过 `ndl rules update` 安装已校验的远程 YAML 规则
 - 当规则声明 `fetcher.type: browser` 时，可选使用 Playwright 浏览器渲染页面，并支持规则声明等待/视口控制
-- 使用 `scripts/verify_distribution.py` 校验 release-candidate wheel/sdist 内容
+- 使用 `scripts/verify_distribution.py` 校验 release wheel/sdist 内容
 - 在本地 Web UI 中搜索、下载、手动刷新书库，`ndl serve` 运行时也可按间隔自动刷新
 - 通过 `ndl serve` 启动本地 Web UI（默认绑定 `127.0.0.1`）
 - 下载时强制 robots.txt、域名限速、重试策略与首跑合法使用免责声明

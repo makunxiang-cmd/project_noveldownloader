@@ -7,8 +7,8 @@ version on a `.dev0` suffix until the next release.
 
 - Current package version: `0.2.0.dev0`
 - Latest public release: `0.1.0`
-- Version bump should happen in a dedicated release commit after P7 release-candidate
-  gates are green and release notes are reviewed.
+- Final release version bumps happen in a dedicated release commit after the
+  preflight gates are green and release notes are reviewed.
 
 ## Preflight
 
@@ -54,7 +54,7 @@ python -m zipfile -l dist/ndl_storykit-*.whl
 tar -tf dist/ndl_storykit-*.tar.gz
 ```
 
-Prefer the automated verifier for repeatable release-candidate checks:
+Prefer the automated verifier for repeatable release checks:
 
 ```bash
 uv run python scripts/verify_distribution.py dist/ndl_storykit-*.whl dist/ndl_storykit-*.tar.gz
@@ -113,10 +113,10 @@ written maintainer approval in the same turn.
 | Build artifacts (`uv build`) | anyone |
 | Run `scripts/verify_distribution.py` against the build | anyone |
 | Run `scripts/smoke_cli.py` against the install | anyone |
-| Bump `pyproject.toml` version from `0.1.0.dev0` → `0.1.0` | **maintainer only** |
-| Edit `CHANGELOG.md` to add a dated `[0.1.0]` heading | **maintainer only** |
+| Bump package version from the active `.dev0` version to the final release version | **maintainer only** |
+| Edit `CHANGELOG.md` to add a dated release heading | **maintainer only** |
 | Create a release commit | **maintainer only** |
-| Create a git tag (`v0.1.0`) | **maintainer only** |
+| Create a release git tag | **maintainer only** |
 | Push the tag to `origin` | **maintainer only** |
 | Create a GitHub Release | **maintainer only** |
 | Upload to PyPI (`uv publish` / `twine upload`) | **maintainer only** |
@@ -131,26 +131,28 @@ Follow these steps only after the execution gate has been authorized:
 
 1. Confirm `git status` is clean on a branch off `main`, and that all
    commits are signed-off as expected for this repository.
-2. Update `pyproject.toml`: change `version = "0.1.0.dev0"` to
-   `version = "0.1.0"`. Update `Development Status` classifier if a new
-   stability level is intended.
-3. Update `CHANGELOG.md`: convert `## [Unreleased]` to
-   `## [0.1.0] - <YYYY-MM-DD>`, keep an empty `## [Unreleased]` placeholder
-   above it.
-4. Commit with a message like `chore(release): NDL v0.1.0`.
+2. Update `pyproject.toml`, `src/ndl/__init__.py`, `uv.lock`, and distribution
+   verifier expectations from the active `.dev0` version to the chosen final
+   release version. Update `Development Status` classifier if a new stability
+   level is intended.
+3. Update `CHANGELOG.md`: move finished entries from `## [Unreleased]` into a
+   dated release heading such as `## [0.2.0] - <YYYY-MM-DD>`, keeping an empty
+   `## [Unreleased]` placeholder above it.
+4. Commit with a message like `chore(release): NDL v0.2.0`.
 5. Run the full preflight, build, verifier, and install smoke locally.
 6. Push the branch and open a PR; wait for the CI matrix on Python
    3.10-3.14 across ubuntu / macOS / windows to go green.
-7. Tag the merged commit: `git tag -s v0.1.0 -m "NDL v0.1.0"` (or `-a`
-   if a GPG key is not configured for the maintainer account).
-8. Push the tag: `git push origin v0.1.0`.
-9. Create a GitHub Release that points at the tag and pastes the
-   `docs/release-notes/v0.1.md` body (drop the draft notice).
+7. Tag the merged commit, for example `git tag -s v0.2.0 -m "NDL v0.2.0"`
+   (or `-a` if a GPG key is not configured for the maintainer account).
+8. Push the tag, for example `git push origin v0.2.0`.
+9. Create a GitHub Release that points at the tag and uses the reviewed release
+   notes for that version.
 10. Upload to PyPI from the build artifacts produced on the tagged commit
     using the maintainer's credentials. Verify the PyPI listing renders the
     README and links to the GitHub repo.
-11. Open a follow-up commit on `main` that bumps `pyproject.toml` to the
-    next development version (e.g. `0.2.0.dev0`).
+11. Open a follow-up commit on `main` that bumps package metadata and verifier
+    expectations to the next development version, for example `0.3.0.dev0`
+    after releasing `0.2.0`.
 
 ## Boundaries
 
