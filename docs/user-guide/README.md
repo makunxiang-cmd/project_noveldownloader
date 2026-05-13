@@ -18,7 +18,7 @@ uv run ndl doctor browser
 ```
 
 The package is not published to PyPI yet. After v0.1 ships, the install
-command will be `pip install noveldownloader` (the Python import path and the
+command will be `pip install ndl-storykit` (the Python import path and the
 `ndl` CLI entry point stay the same).
 
 ## CLI Reference

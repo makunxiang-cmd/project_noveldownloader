@@ -29,11 +29,11 @@ can pick up without re-deriving the roadmap.
 - The bare `ndl` name on PyPI has been registered since 2016 by an
   unrelated abandoned project (`msull/needle`, last release 0.2). PEP 541
   reclaim would be slow and uncertain.
-- Decision: ship as `noveldownloader`. Python import path stays
+- Decision: ship as `ndl-storykit`. Python import path stays
   `from ndl ...`; CLI entry point stays `ndl`. Only the *distribution*
   (wheel/sdist artifact name + `pip install` argument) changes.
 - Done in commit `0b412af`. Verified end-to-end: `uv build` produces
-  `noveldownloader-0.1.0.dev0-py3-none-any.whl` + `.tar.gz`,
+  `ndl-storykit-0.1.0.dev0-py3-none-any.whl` + `.tar.gz`,
   `scripts/verify_distribution.py` accepts both, a fresh
   `python -m venv` + `pip install <wheel>` + `scripts/smoke_cli.py`
   reports `Smoke OK.`.
@@ -53,9 +53,9 @@ Agent cannot create the account, set 2FA, or store recovery codes.
 ### A2 — PyPI API token ⏳ maintainer-only (depends on A1)
 
 - After A1, https://pypi.org/manage/account/token/ → "Add API token".
-- Token name: e.g. `noveldownloader-release-1`.
+- Token name: e.g. `ndl-storykit-release-1`.
 - Scope: **must be "Entire account" for the first release** (the
-  `noveldownloader` project does not exist on PyPI yet, so a
+  `ndl-storykit` project does not exist on PyPI yet, so a
   project-scoped token can't be issued). After B15 succeeds, generate a
   project-scoped token and replace the account-wide one.
 - Copy the `pypi-...` token immediately (only shown once).
@@ -173,7 +173,7 @@ relevant runbook step and stop.
 
 - Strip "Status: draft" notice from `docs/release-notes/v0.1.md` header.
 - Update README install snippet from "after v0.1 reaches PyPI" to the
-  live `pip install noveldownloader` command (already pointing at the
+  live `pip install ndl-storykit` command (already pointing at the
   new name; just drop the conditional wording).
 - If Pages is enabled (A4 toggle), confirm
   https://makunxiang-cmd.github.io/project_noveldownloader/ shows the
@@ -189,8 +189,8 @@ relevant runbook step and stop.
 After v0.1.0 lands on PyPI:
 
 ```bash
-pip install noveldownloader                  # base install
-pip install 'noveldownloader[browser]'       # optional Playwright fetcher
+pip install ndl-storykit                  # base install
+pip install 'ndl-storykit[browser]'       # optional Playwright fetcher
 playwright install chromium                  # only with browser extra
 ndl doctor browser                           # confirm browser runtime
 ndl rules list                               # see builtin example_static

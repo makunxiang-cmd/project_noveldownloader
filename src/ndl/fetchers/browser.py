@@ -31,7 +31,7 @@ class BrowserSession(Protocol):
 
 BrowserSessionFactory = Callable[[SourceRule, dict[str, str], float], Awaitable[BrowserSession]]
 _BROWSER_INSTALL_DETAIL = (
-    "Install with `pip install 'noveldownloader[browser]'` or `uv sync --extra browser`, "
+    "Install with `pip install 'ndl-storykit[browser]'` or `uv sync --extra browser`, "
     "then run `playwright install chromium`."
 )
 
