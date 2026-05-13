@@ -22,5 +22,6 @@ def test_env_overrides_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
 
 def test_user_expansion(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.setenv("NDL_HOME", "~/custom-ndl")
     assert ndl_home() == tmp_path / "custom-ndl"

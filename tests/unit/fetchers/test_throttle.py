@@ -12,7 +12,8 @@ from ndl.fetchers._throttle import HostThrottle
 
 @pytest.mark.asyncio
 async def test_throttle_enforces_min_interval_between_requests() -> None:
-    throttle = HostThrottle(min_interval_ms=80, max_concurrency=1)
+    interval_ms = 200
+    throttle = HostThrottle(min_interval_ms=interval_ms, max_concurrency=1)
 
     start = time.monotonic()
     async with throttle.slot():
@@ -21,7 +22,8 @@ async def test_throttle_enforces_min_interval_between_requests() -> None:
         pass
     elapsed = time.monotonic() - start
 
-    assert elapsed >= 0.08
+    # 20ms tolerance: Windows asyncio.sleep granularity is ~15.6ms by default.
+    assert elapsed >= (interval_ms - 20) / 1000.0
 
 
 @pytest.mark.asyncio
