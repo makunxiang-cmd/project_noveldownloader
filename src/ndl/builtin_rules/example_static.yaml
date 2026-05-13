@@ -73,3 +73,19 @@ chapter:
       min_paragraph_length: 2
   pagination:
     type: none
+
+search:
+  url_template: "https://example-novels.test/search?q={keyword}"
+  results_container: "#search-results"
+  items: ".result-item"
+  fields:
+    title:
+      selector: ".result-title"
+      attr: text
+    author:
+      selector: ".result-author"
+      attr: text
+    url:
+      selector: "a.result-link"
+      attr: href
+      resolve: relative

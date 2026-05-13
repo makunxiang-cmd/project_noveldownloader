@@ -1,6 +1,8 @@
 # NDL P5 Search and Remote Rules Plan
 
-> Status: planned. P5 adds rule-defined search and compliant remote rule updates after P4 library update flows.
+> Status: implemented. P5 adds rule-defined search and compliant remote rule updates after P4 library update flows.
+>
+> Handoff note, 2026-05-13: all P5 slices are implemented and verified. Do not treat this as an active plan for new work; read `docs/superpowers/SESSION-STATE.md` for the current active milestone.
 
 ## Goal
 
@@ -23,7 +25,7 @@ P5 must preserve the existing compliance constraints: no commercial platform sup
 
 ### P5.1 Search Domain + Service
 
-Status: planned.
+Status: implemented.
 
 Scope:
 
@@ -39,7 +41,7 @@ Exit criteria:
 
 ### P5.2 `ndl search`
 
-Status: planned.
+Status: implemented.
 
 Scope:
 
@@ -53,7 +55,7 @@ Exit criteria:
 
 ### P5.3 Remote Rule Update
 
-Status: planned.
+Status: implemented.
 
 Scope:
 
@@ -69,7 +71,7 @@ Exit criteria:
 
 ### P5.4 Web Search Surface
 
-Status: planned.
+Status: implemented.
 
 Scope:
 

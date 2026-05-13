@@ -7,7 +7,7 @@ import textwrap
 import pytest
 
 from ndl.core.errors import RuleNotFoundError, RuleValidationError
-from ndl.rules.loader import RuleLoadSource, load_rule_file, load_rules
+from ndl.rules.loader import RuleLoadSource, load_default_rules, load_rule_file, load_rules
 from ndl.rules.resolver import RuleResolver
 
 RULE_YAML = """
@@ -67,6 +67,24 @@ def test_load_rules_higher_source_priority_overrides_same_id(tmp_path) -> None:
 
     assert len(rules) == 1
     assert rules[0].priority == 99
+
+
+def test_load_default_rules_includes_user_installed_overrides(tmp_path) -> None:
+    user_rules = tmp_path / "rules"
+    user_rules.mkdir()
+    (user_rules / "example_static.yaml").write_text(
+        textwrap.dedent(RULE_YAML)
+        .replace("id: local_rule", "id: example_static")
+        .replace("name: Local Rule", "name: User Override")
+        .replace("priority: 10", "priority: 99"),
+        encoding="utf-8",
+    )
+
+    rules = load_default_rules(user_rules_path=user_rules)
+
+    rule = next(rule for rule in rules if rule.id == "example_static")
+    assert rule.name == "User Override"
+    assert rule.priority == 99
 
 
 def test_rule_resolver_uses_highest_rule_priority(tmp_path) -> None:

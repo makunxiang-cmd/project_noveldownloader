@@ -35,6 +35,29 @@
     </form>
   </section>
 
+  <section class="search-panel" aria-label="Search sources">
+    <form class="search-form" action="/search" method="get">
+      <label>
+        Keyword
+        <input name="keyword" type="search" required>
+      </label>
+      <label>
+        Source
+        <select name="rule_id">
+          <option value="">All</option>
+          {% for rule in searchable_rules %}
+            <option value="{{ rule.id }}">{{ rule.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Limit
+        <input name="limit" type="number" min="1" max="100" value="{{ default_search_limit }}">
+      </label>
+      <button type="submit">Search</button>
+    </form>
+  </section>
+
   <section class="library-panel" aria-label="Saved novels">
     {% if summaries %}
       <table class="library-table">

@@ -7,6 +7,7 @@ from pathlib import Path
 
 _ENV_HOME = "NDL_HOME"
 _LIBRARY_DB = "library.db"
+_RULES_DIR = "rules"
 
 
 def ndl_home() -> Path:
@@ -20,3 +21,8 @@ def ndl_home() -> Path:
 def library_db_path() -> Path:
     """Return the absolute path to the local library SQLite database."""
     return ndl_home() / _LIBRARY_DB
+
+
+def rules_dir() -> Path:
+    """Return the user-installed rules directory."""
+    return ndl_home() / _RULES_DIR

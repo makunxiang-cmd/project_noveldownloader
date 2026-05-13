@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from ndl.rules.loader import load_builtin_rules
-from ndl.rules.schema import FetcherRule, RateLimitRule, RobotsRule, SourceRule
+from ndl.rules.schema import BrowserRule, FetcherRule, RateLimitRule, RobotsRule, SourceRule
 
 
 def test_builtin_example_rule_loads_and_matches_url() -> None:
@@ -31,6 +31,33 @@ def test_rate_limit_enforces_concurrency_ceiling() -> None:
 def test_robots_ignore_requires_justification() -> None:
     with pytest.raises(ValidationError, match="ignore_justification"):
         RobotsRule(respect=False)
+
+
+def test_browser_rule_validates_runtime_controls() -> None:
+    rule = BrowserRule(
+        navigation_timeout_ms=15000,
+        wait_until="domcontentloaded",
+        wait_for_selector="#ready",
+        extra_wait_ms=250,
+        viewport={"width": 1024, "height": 768},
+        javascript_enabled=False,
+    )
+
+    assert rule.navigation_timeout_ms == 15000
+    assert rule.wait_until == "domcontentloaded"
+    assert rule.wait_for_selector == "#ready"
+    assert rule.extra_wait_ms == 250
+    assert rule.viewport.width == 1024
+    assert rule.javascript_enabled is False
+
+
+def test_browser_rule_rejects_invalid_runtime_controls() -> None:
+    with pytest.raises(ValidationError):
+        BrowserRule(wait_until="idle")
+    with pytest.raises(ValidationError):
+        BrowserRule(navigation_timeout_ms=999)
+    with pytest.raises(ValidationError):
+        BrowserRule(viewport={"width": 100, "height": 900})
 
 
 def test_source_rule_rejects_invalid_regex() -> None:

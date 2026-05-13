@@ -12,6 +12,7 @@ PatternType = Literal["regex", "glob"]
 FetcherType = Literal["http", "browser"]
 BackoffType = Literal["fixed", "exponential"]
 EncodingName = Literal["utf-8", "gbk", "gb18030", "auto"]
+BrowserWaitUntil = Literal["commit", "domcontentloaded", "load", "networkidle"]
 PaginationType = Literal["none", "next"]
 SelectorAttr = Literal["text", "html", "href", "src"]
 ResolveMode = Literal["none", "relative"]
@@ -72,6 +73,24 @@ class RobotsRule(StrictModel):
         return self
 
 
+class BrowserViewportRule(StrictModel):
+    """Viewport settings for browser-backed rules."""
+
+    width: int = Field(default=1280, ge=320, le=3840)
+    height: int = Field(default=900, ge=240, le=2160)
+
+
+class BrowserRule(StrictModel):
+    """Browser runtime controls for browser-backed rules."""
+
+    navigation_timeout_ms: int = Field(default=30000, ge=1000, le=120000)
+    wait_until: BrowserWaitUntil = "networkidle"
+    wait_for_selector: str | None = Field(default=None, min_length=1)
+    extra_wait_ms: int = Field(default=0, ge=0, le=10000)
+    viewport: BrowserViewportRule = Field(default_factory=BrowserViewportRule)
+    javascript_enabled: bool = True
+
+
 class FetcherRule(StrictModel):
     """Fetcher configuration for a source rule."""
 
@@ -81,6 +100,7 @@ class FetcherRule(StrictModel):
     retry: RetryRule = Field(default_factory=RetryRule)
     robots: RobotsRule = Field(default_factory=RobotsRule)
     encoding: EncodingName = "auto"
+    browser: BrowserRule = Field(default_factory=BrowserRule)
 
 
 class Selector(StrictModel):

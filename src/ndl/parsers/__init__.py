@@ -1,4 +1,4 @@
-"""Parsers that produce Novel/Chapter domain objects."""
+"""Parsers that produce Novel/Chapter/SearchResult domain objects."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from ndl.parsers.html_chapter import parse_chapter
 from ndl.parsers.html_index import parse_index
+from ndl.parsers.html_search import parse_search
 from ndl.parsers.txt_reader import TxtReader, parse_txt, read_txt
 
 if TYPE_CHECKING:
@@ -26,4 +27,12 @@ class HtmlParser:
         return parse_chapter(self._rule, html, index=index, source_url=source_url)
 
 
-__all__ = ["HtmlParser", "TxtReader", "parse_chapter", "parse_index", "parse_txt", "read_txt"]
+__all__ = [
+    "HtmlParser",
+    "TxtReader",
+    "parse_chapter",
+    "parse_index",
+    "parse_search",
+    "parse_txt",
+    "read_txt",
+]

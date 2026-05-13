@@ -42,6 +42,24 @@ def load_rule_file(path: Path) -> SourceRule:
         ) from exc
 
 
+def load_rule_text(text: str, *, source_name: str) -> SourceRule:
+    """Load and validate one YAML rule from a string."""
+    try:
+        raw = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise RuleLoadError(f"Could not parse YAML rule: {source_name}", detail=str(exc)) from exc
+
+    if not isinstance(raw, dict):
+        raise RuleValidationError(f"Rule text must contain a YAML mapping: {source_name}")
+
+    try:
+        return SourceRule.model_validate(raw)
+    except ValidationError as exc:
+        raise RuleValidationError(
+            f"Rule schema validation failed: {source_name}", detail=str(exc)
+        ) from exc
+
+
 def load_builtin_rules() -> list[SourceRule]:
     """Load YAML rules bundled inside the package."""
     rules_package = resources.files("ndl.builtin_rules")
@@ -51,6 +69,21 @@ def load_builtin_rules() -> list[SourceRule]:
             with resources.as_file(rule_path) as path:
                 rules.append(load_rule_file(path))
     return rules
+
+
+def load_default_rules(*, user_rules_path: Path | None = None) -> list[SourceRule]:
+    """Load bundled rules plus user-installed overrides."""
+    loaded: dict[str, tuple[int, SourceRule]] = {
+        rule.id: (0, rule) for rule in load_builtin_rules()
+    }
+    if user_rules_path is not None and user_rules_path.exists():
+        for rule_path in sorted(user_rules_path.glob("*.y*ml")):
+            rule = load_rule_file(rule_path)
+            loaded[rule.id] = (100, rule)
+    return [
+        rule
+        for _, rule in sorted(loaded.values(), key=lambda item: (-item[1].priority, item[1].id))
+    ]
 
 
 def load_rules(*sources: RuleLoadSource) -> list[SourceRule]:

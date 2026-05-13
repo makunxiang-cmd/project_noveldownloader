@@ -90,3 +90,20 @@ class Novel(BaseModel):
         if indices != sorted(indices):
             raise ValueError("chapters must be sorted by index")
         return self
+
+
+class SearchResult(BaseModel):
+    """A single result returned by a rule-driven search query."""
+
+    model_config = ConfigDict(frozen=True)
+
+    title: str = Field(min_length=1)
+    author: str | None = None
+    url: str = Field(min_length=1)
+    source_rule_id: str = Field(min_length=1)
+    source_name: str = Field(min_length=1)
+
+    @field_validator("title", "url", "source_rule_id", "source_name")
+    @classmethod
+    def _strip_non_empty(cls, value: str) -> str:
+        return value.strip()

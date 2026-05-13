@@ -4,6 +4,8 @@ This package intentionally depends only on the Python standard library and
 Pydantic. Outer layers depend on these objects, not the other way around.
 """
 
+from __future__ import annotations
+
 from ndl.core.errors import (
     BrowserError,
     ConfigError,
