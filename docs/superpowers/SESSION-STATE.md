@@ -2,7 +2,9 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取活动的 release-prep plan，然后参考已完成的 P7/P6/P5 plan。
 >
-> 最后更新：2026-05-13（P7 全部 4 个 slice 完成、9 项预发布加固完成、PyPI 改名 `ndl-storykit`、main 启用轻度分支保护、MkDocs Pages workflow 已就绪等 Pages source 切换。活动计划 `docs/superpowers/plans/2026-05-13-ndl-release-prep.md`）
+> 最后更新：2026-05-13（v0.1.0 已发布：PyPI `ndl-storykit`、GitHub tag/release
+> `v0.1.0`、Pages 已部署；当前源码已推进到 `0.2.0.dev0`。活动计划
+> `docs/superpowers/plans/2026-05-13-ndl-release-prep.md` 进入发布后维护阶段）
 
 ---
 
@@ -12,22 +14,39 @@
 
 ## 0.1 下个 agent 快速接手摘要
 
-- **当前状态**：P0-P7 全部实现 + 9 项预发布 P0/P1/P2 加固已实现 + Phase A (Pre-release setup) 3/6 已实现。**仓库已到达 release candidate state**，等待 maintainer 完成 A1+A2+Pages-Source 三件不可代理的 web UI 操作后即可进入 Phase B（release execution）。
-- **活动计划**：`docs/superpowers/plans/2026-05-13-ndl-release-prep.md` 列出了 A→E 五阶段的完整路线。新 session 进来先读这个 + 本文件。
-- **PyPI 命名**：`ndl` 名字 2016 年被无关项目 `msull/needle` 注册，故 v0.1 发行名 = **`ndl-storykit`**。Python import (`from ndl...`) 与 CLI 入口 (`ndl`) 保持不变。已 `uv build` 生成 `ndl-storykit-0.1.0.dev0` 工件并跑过 verifier + clean-venv smoke 全绿。
+- **当前状态**：P0-P7 全部实现 + 9 项预发布 P0/P1/P2 加固已实现。
+  v0.1.0 已由 maintainer 发布到 GitHub Release 和 PyPI；当前源码版本已回到
+  **`0.2.0.dev0`**。
+- **活动计划**：`docs/superpowers/plans/2026-05-13-ndl-release-prep.md` 已记录
+  从 release candidate 到 published v0.1.0 的路线；当前进入 Phase E 日常维护。
+- **PyPI 命名**：`ndl` 名字 2016 年被无关项目 `msull/needle` 注册，`noveldownloader`
+  又被 PyPI 判定过于接近既有 `novel-downloader`，故 v0.1 发行名 =
+  **`ndl-storykit`**。Python import (`from ndl...`) 与 CLI 入口 (`ndl`) 保持不变。
+  PyPI：<https://pypi.org/project/ndl-storykit/>。
 - **`main` 分支保护已开启**（轻度）：要求 PR，但 `required_approving_review_count = 0`；force-push / 删 main 禁用；CI status check 暂未列为 required（因 paths-ignore 会导致 doc-only PR 卡住）。**Agent 工作流：必须 `git checkout -b <topic>` → push → `gh pr create` → `gh pr merge --squash`**，不能再 `git push origin main`。`gh` CLI 已在本地装好并认证为 `makunxiang-cmd`。
-- **Phase A 进度**：
-  - A0 改名 `ndl-storykit` ✅（commit `0b412af`）
-  - A1 PyPI 账号 + 2FA ⏳ **等 maintainer 手动**
-  - A2 PyPI API token ⏳ **等 maintainer 手动**（依赖 A1）
+- **Release prep 进度**：
+  - A0 改名 `ndl-storykit` ✅
+  - A1 PyPI 账号 + 2FA ✅ maintainer completed
+  - A2 PyPI API token ✅ maintainer completed；发布后已换成 project-scoped token
   - A3 main 分支保护 ✅ 已开
-  - A4 MkDocs Pages workflow ✅ workflow 已合（`aea9978`），**Pages source 待 maintainer 在 web UI 切换为 "GitHub Actions"**
+  - A4 MkDocs Pages workflow ✅，Pages source 已切到 "GitHub Actions"，部署成功
   - A5 tag GPG 签名 ⏳ 可选；若不签 tag B13 用 `git tag -a` 即可
   - A6 Issue/PR 模板 ✅ 早已存在
-- **Phase B (release execution) 仍 100% 由 maintainer 执行**。Agent 不得 bump 版本、改 CHANGELOG 日期 heading、做 release commit、打 tag、push tag、建 GitHub Release、上 PyPI。
-- **最后完整验证（PyPI 改名后）**：`.venv/bin/ruff check .`、`.venv/bin/ruff format --check .`、`.venv/bin/mypy src/ndl`、`.venv/bin/pytest --cov=ndl --cov-report=term` 全绿；pytest **185 passed**，coverage **88.96%**。`uv run mkdocs build --strict --config-file docs/mkdocs.yml` 也零 warning 通过。
+  - Phase B release execution ✅ maintainer completed: release commit
+    `614f3e8`, tag `v0.1.0`, GitHub Release, PyPI upload
+  - Phase C immediate housekeeping ✅ in progress in post-release PR:
+    docs no longer say draft/unpublished; version bumped to `0.2.0.dev0`
+- **未来 release execution 仍 100% 由 maintainer 执行**。Agent 不得 bump release
+  版本、改 CHANGELOG 日期 heading、做 release commit、打 tag、push tag、建 GitHub
+  Release、上 PyPI。
+- **最后完整验证（v0.1.0 发布）**：`uv lock --check`、`ruff check .`、`ruff format --check .`、
+  `mypy src/ndl`、`pytest --cov=ndl --cov-report=term --cov-report=xml`、`pre-commit run --all-files`、
+  `uv build --wheel --sdist`、`scripts/verify_distribution.py` 全绿；pytest
+  **185 passed**，coverage **88.96%**。发布后 clean venv `pip install ndl-storykit`
+  + `scripts/smoke_cli.py` 通过。
 - **加固后契约改动**：`SearchService.search()` 返回 `SearchOutcome(results, failures)` 而非 `list[SearchResult]`；调用方需通过 `outcome.results` / `outcome.failures` 访问。CLI 与 Web 均已适配。
-- **CI 状态**：main 上的最新 push（`aea9978`）CI 主 workflow 全绿（15/15 cells + lint）；Docs workflow build ✅、deploy ❌（Pages source 未启用，预期失败）。
+- **CI 状态**：release PR #2 和 PyPI 改名 PR #3 均为 CI 全绿。Pages workflow 已通过
+  GitHub Actions 部署。
 - **本地 Web 验证**：`ndl serve` 在 `127.0.0.1:8765` 做过 HTTP smoke check，首页 200，空 keyword 搜索 400。Playwright runtime 仍需使用者 `pip install 'ndl-storykit[browser]'` + `playwright install chromium`。
 
 ---

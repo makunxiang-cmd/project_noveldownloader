@@ -1,8 +1,8 @@
 # NDL Release Preparation Plan (Phases A–E)
 
-> Status: active. P7 verification is complete; this plan tracks the
-> end-to-end path from release-candidate state to a published v0.1.0 plus
-> the day-after operating routine. Phase A is the current focus.
+> Status: published / operating. P7 verification is complete and v0.1.0 was
+> published on 2026-05-13 as the PyPI distribution `ndl-storykit`. This plan
+> now serves as the release record plus ongoing maintenance guide.
 >
 > Owners: maintainer (`makunxiang-cmd`) for account / web-UI / publication
 > actions; agents (Claude or otherwise) for code/doc/tooling work routed
@@ -29,16 +29,18 @@ can pick up without re-deriving the roadmap.
 - The bare `ndl` name on PyPI has been registered since 2016 by an
   unrelated abandoned project (`msull/needle`, last release 0.2). PEP 541
   reclaim would be slow and uncertain.
-- Decision: ship as `ndl-storykit`. Python import path stays
+- Initial decision was `noveldownloader`, but PyPI rejected that name as too
+  similar to the existing `novel-downloader` project during publication.
+  Final decision: ship as `ndl-storykit`. Python import path stays
   `from ndl ...`; CLI entry point stays `ndl`. Only the *distribution*
   (wheel/sdist artifact name + `pip install` argument) changes.
-- Done in commit `0b412af`. Verified end-to-end: `uv build` produces
-  `ndl-storykit-0.1.0.dev0-py3-none-any.whl` + `.tar.gz`,
+- Done through release PRs #2 and #3. Verified end-to-end: `uv build` produces
+  `ndl_storykit-0.1.0-py3-none-any.whl` + `.tar.gz`,
   `scripts/verify_distribution.py` accepts both, a fresh
-  `python -m venv` + `pip install <wheel>` + `scripts/smoke_cli.py`
+  `python -m venv` + `pip install ndl-storykit` + `scripts/smoke_cli.py`
   reports `Smoke OK.`.
 
-### A1 — PyPI account + 2FA ⏳ maintainer-only
+### A1 — PyPI account + 2FA ✅ completed by maintainer
 
 - https://pypi.org/account/register/ — real-name email registration.
 - Verify email.
@@ -50,7 +52,7 @@ can pick up without re-deriving the roadmap.
 
 Agent cannot create the account, set 2FA, or store recovery codes.
 
-### A2 — PyPI API token ⏳ maintainer-only (depends on A1)
+### A2 — PyPI API token ✅ completed by maintainer
 
 - After A1, https://pypi.org/manage/account/token/ → "Add API token".
 - Token name: e.g. `ndl-storykit-release-1`.
@@ -83,8 +85,9 @@ username = __token__
 password = pypi-<paste-testpypi-token>
 ```
 
-Agent cannot log in to PyPI, see / generate the token, or write it to
-`~/.pypirc`.
+The first upload used an account-wide token because the project did not exist
+yet. After publication, the maintainer generated a project-scoped token for
+`ndl-storykit` and revoked the account-wide token.
 
 ### A3 — `main` branch protection (lightweight) ✅ enabled (2026-05-13)
 
@@ -107,7 +110,7 @@ Agent cannot log in to PyPI, see / generate the token, or write it to
   no-op-pass job (the pattern is already noted in
   `docs/developer/README.md` → "CI behavior" section).
 
-### A4 — MkDocs → GitHub Pages workflow ✅ partial (workflow shipped, Pages source pending)
+### A4 — MkDocs → GitHub Pages workflow ✅ completed
 
 - `.github/workflows/docs.yml` shipped in commit `aea9978`. On push to
   `main` (when `docs/**`, `mkdocs.yml`, `CHANGELOG.md`, or top-level
@@ -116,13 +119,9 @@ Agent cannot log in to PyPI, see / generate the token, or write it to
   `actions/deploy-pages@v4`.
 - Local `uv run mkdocs build --strict --config-file docs/mkdocs.yml`
   produces zero warnings.
-- **Maintainer action still required (one-time, web UI only):**
-  - https://github.com/makunxiang-cmd/project_noveldownloader/settings/pages
-  - Build and deployment → Source → change from "Deploy from a branch"
-    to **"GitHub Actions"** → Save.
-- Until that toggle is set, the `Deploy to GitHub Pages` job in the Docs
-  workflow fails with HTTP 404 (the Build step still passes). The first
-  push after the toggle will succeed and publish to
+- Maintainer switched Pages source to **GitHub Actions**. Manual Docs workflow
+  run `25802138560` built and deployed successfully.
+- Published site:
   https://makunxiang-cmd.github.io/project_noveldownloader/.
 
 ### A5 — Tag signing key (GPG / SSH) ⏳ optional, maintainer-only
@@ -156,33 +155,32 @@ to GitHub.
 - The rule_request template already enforces the ethics check (no
   commercial platforms, no paywalls).
 
-## Phase B — Release execution ⛔ MAINTAINER-ONLY
+## Phase B — Release execution ✅ completed by maintainer
 
-See `docs/developer/release.md` "Execution Gate" + "Maintainer Runbook".
-The 11-step runbook covers: version bump (`0.1.0.dev0` → `0.1.0`), dated
-CHANGELOG heading, release commit, PR + CI green, tag, push tag, GitHub
-Release, PyPI upload (`uv publish` or `twine upload`), verify PyPI
-listing, and the post-release `0.2.0.dev0` bump.
+Release record:
 
-Agent boundary: **never** bump the version, edit CHANGELOG to insert a
-dated `[0.1.0]` heading, create a release commit, create / push a tag,
-create a GitHub Release, or upload to PyPI. If asked, reply with the
-relevant runbook step and stop.
+- Release commit: `614f3e8dbc78154cf7bd9b3b1a4db5000c792a86`
+- Tag: `v0.1.0`
+- GitHub Release: <https://github.com/makunxiang-cmd/project_noveldownloader/releases/tag/v0.1.0>
+- PyPI: <https://pypi.org/project/ndl-storykit/>
+- Post-publish smoke: clean venv `pip install ndl-storykit` succeeded;
+  `scripts/smoke_cli.py` reported `NDL 0.1.0` and `Smoke OK.`
 
-## Phase C — Post-release housekeeping (after B succeeds)
+Future releases still use `docs/developer/release.md` "Execution Gate" +
+"Maintainer Runbook". Agent boundary: **never** bump a release version, edit
+CHANGELOG to insert a dated release heading, create a release commit, create /
+push a tag, create a GitHub Release, or upload to PyPI. If asked, reply with
+the relevant runbook step and stop.
 
-- Strip "Status: draft" notice from `docs/release-notes/v0.1.md` header.
-- Update README install snippet from "after v0.1 reaches PyPI" to the
-  live `pip install ndl-storykit` command (already pointing at the
-  new name; just drop the conditional wording).
-- If Pages is enabled (A4 toggle), confirm
-  https://makunxiang-cmd.github.io/project_noveldownloader/ shows the
-  release notes nav entry.
-- Add a release log entry to
-  `docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md`
-  recording the release commit hash, tag, and PyPI publish timestamp.
-- Generate a new project-scoped PyPI API token; revoke the account-wide
-  token from A2.
+## Phase C — Post-release housekeeping ✅ completed / in PR
+
+- Stripped "Status: draft" notice from `docs/release-notes/v0.1.md`.
+- Updated README/user guide install snippets to the live
+  `pip install ndl-storykit` command.
+- Release log added to
+  `docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md`.
+- Project-scoped PyPI API token generated; account-wide token revoked.
+- Current development version advanced to `0.2.0.dev0`.
 
 ## Phase D — User installation flow (anyone)
 

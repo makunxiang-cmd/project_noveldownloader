@@ -1,6 +1,7 @@
 # User Guide
 
-NDL is still pre-release. Use it from a checkout with `uv`.
+NDL v0.1.0 is published on PyPI as `ndl-storykit`. The Python import path and
+CLI entry point stay `ndl`.
 
 ## Install From Source
 
@@ -17,9 +18,8 @@ uv run playwright install chromium
 uv run ndl doctor browser
 ```
 
-The package is not published to PyPI yet. After v0.1 ships, the install
-command will be `pip install ndl-storykit` (the Python import path and the
-`ndl` CLI entry point stay the same).
+Install from PyPI with `pip install ndl-storykit`, or
+`pip install 'ndl-storykit[browser]'` for browser-backed rules.
 
 ## CLI Reference
 
@@ -198,15 +198,8 @@ NDL keeps everything in a single home directory. Override the location with the
 
 Tests redirect this with `NDL_HOME=/tmp/ndl-home` to keep CI hermetic.
 
-## Current Release-Candidate Work
+## Current Release
 
-P6 release hardening is complete and P7 is active. P7.1 added repeatable
-wheel/sdist verification through `scripts/verify_distribution.py`. Next planned
-work is P7.2 release notes, P7.3 install smoke strategy, and P7.4 release
-execution gate.
-
-Do not treat the current checkout as a published package: there is no PyPI
-release yet, and version bumping, git tags, GitHub Releases, or PyPI upload
-require explicit maintainer approval.
-
-See `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.
+v0.1.0 is published on PyPI as `ndl-storykit` and tagged as `v0.1.0` on
+GitHub. Current source checkouts are back on the next development version
+after release.

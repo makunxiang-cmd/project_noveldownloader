@@ -62,7 +62,7 @@ nav:
       - Overview: developer/README.md
       - Release Runbook: developer/release.md
   - Release Notes:
-      - v0.1 (Draft): release-notes/v0.1.md
+      - v0.1: release-notes/v0.1.md
   - Architecture:
       - ADR-0001 — Architecture & Dependencies: adr/0001-architecture-and-deps.md
       - Design Spec: superpowers/specs/2026-04-20-ndl-design.md

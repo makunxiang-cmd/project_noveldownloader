@@ -60,9 +60,8 @@ uv run playwright install chromium
 uv run ndl doctor browser
 ```
 
-The package has not been released to PyPI yet. The distribution name will be
-`ndl-storykit` (the import path inside the package is still `ndl`, and the
-CLI entry point is still `ndl`). When v0.1 ships the install becomes:
+The package is published on PyPI as `ndl-storykit`. The import path inside the
+package is still `ndl`, and the CLI entry point is still `ndl`:
 
 ```bash
 pip install ndl-storykit

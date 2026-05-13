@@ -6,8 +6,9 @@
 >
 > Handoff note, 2026-05-13: P7.1 distribution verifier, P7.2 release notes
 > draft, P7.3 install smoke, and P7.4 execution gate documentation are all
-> implemented. Do not publish, tag, or bump the package version without
-> explicit maintainer approval.
+> implemented. v0.1.0 was later published by the maintainer as `ndl-storykit`;
+> future releases still require explicit maintainer approval for version
+> bumps, tags, GitHub Releases, and PyPI uploads.
 
 ## Goal
 
@@ -56,11 +57,12 @@ Scope:
 
 Output:
 
-- `docs/release-notes/v0.1.md` — draft, marked "pending maintainer approval".
+- `docs/release-notes/v0.1.md` — initially drafted for maintainer approval,
+  then published as the v0.1 release notes after release.
   Leads with highlights and compliance boundaries, then quick-start commands,
   pre-release hardening summary, what's-not-included, quality snapshot, and
   the maintainer-only execution gate.
-- Linked into the MkDocs nav under `Release Notes → v0.1 (Draft)`.
+- Linked into the MkDocs nav under `Release Notes → v0.1`.
 
 Exit criteria:
 
@@ -134,3 +136,13 @@ uv run mypy src/ndl
 uv run pytest --cov=ndl --cov-report=term --cov-report=xml
 uv run pre-commit run --all-files
 ```
+
+## Release Log
+
+- 2026-05-13: v0.1.0 published.
+- Release commit: `614f3e8dbc78154cf7bd9b3b1a4db5000c792a86`
+- Tag: `v0.1.0`
+- GitHub Release: <https://github.com/makunxiang-cmd/project_noveldownloader/releases/tag/v0.1.0>
+- PyPI: <https://pypi.org/project/ndl-storykit/>
+- Post-publish smoke: clean venv `pip install ndl-storykit` succeeded;
+  `scripts/smoke_cli.py` reported `NDL 0.1.0` and `Smoke OK.`
