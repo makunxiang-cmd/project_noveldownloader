@@ -17,10 +17,11 @@ from sse_starlette.sse import EventSourceResponse
 from ndl import __version__
 from ndl.application.container import ServiceContainer
 from ndl.application.paths import ndl_home
-from ndl.application.services import UpdateResult
+from ndl.application.services import SearchOutcome, UpdateResult
 from ndl.core.errors import NDLError, UserError
 from ndl.core.models import Novel
 from ndl.core.progress import ProgressEvent
+from ndl.rules import SourceRule
 from ndl.scheduler import UpdateScheduler
 from ndl.web.jobs import DownloadJob, JobRegistry
 
@@ -28,6 +29,7 @@ _WEB_DIR = Path(__file__).parent
 _STATIC_DIR = _WEB_DIR / "static"
 _TEMPLATES_DIR = _WEB_DIR / "templates"
 _SUPPORTED_DOWNLOAD_FORMATS = {"epub", "txt"}
+_DEFAULT_SEARCH_LIMIT = 20
 
 
 def create_app(
@@ -60,6 +62,7 @@ def create_app(
         finally:
             if update_scheduler is not None:
                 update_scheduler.shutdown()
+            service_container.close()
 
     app = FastAPI(
         title="NDL",
@@ -76,6 +79,7 @@ def create_app(
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request) -> Response:
         summaries = service_container.library_service().list()
+        searchable_rules = _searchable_rules(service_container)
         return templates.TemplateResponse(
             request,
             "index.html",
@@ -83,6 +87,47 @@ def create_app(
                 "app_version": __version__,
                 "summaries": summaries,
                 "download_formats": sorted(_SUPPORTED_DOWNLOAD_FORMATS),
+                "searchable_rules": searchable_rules,
+                "default_search_limit": _DEFAULT_SEARCH_LIMIT,
+            },
+        )
+
+    @app.get("/search", response_class=HTMLResponse)
+    async def search(request: Request) -> Response:
+        keyword = request.query_params.get("keyword", "").strip()
+        rule_id = request.query_params.get("rule_id", "").strip()
+        raw_limit = request.query_params.get("limit", str(_DEFAULT_SEARCH_LIMIT)).strip()
+        searchable_rules = _searchable_rules(service_container)
+        try:
+            if not keyword:
+                raise UserError("Search keyword is required.")
+            limit = _parse_limit(raw_limit)
+            selected_rule_ids = _validate_search_rule_id(rule_id, searchable_rules)
+            outcome = await service_container.search_service().search(
+                keyword,
+                rule_ids=selected_rule_ids,
+            )
+        except NDLError as exc:
+            return _error_response(
+                templates,
+                request,
+                UserError("Search failed.", detail=exc.user_message()),
+                status_code=400,
+            )
+        results = outcome.results[:limit]
+        return templates.TemplateResponse(
+            request,
+            "search_results.html",
+            {
+                "app_version": __version__,
+                "keyword": keyword,
+                "rule_id": rule_id,
+                "limit": limit,
+                "results": results,
+                "failures": outcome.failures,
+                "searchable_rules": searchable_rules,
+                "download_formats": sorted(_SUPPORTED_DOWNLOAD_FORMATS),
+                "summary": _search_summary(outcome),
             },
         )
 
@@ -240,6 +285,43 @@ def _update_summary(results: list[UpdateResult]) -> str:
     updated = sum(result.new_chapter_count for result in results)
     failed = sum(1 for result in results if result.status == "failed")
     return f"{updated} new chapter(s), {failed} failed."
+
+
+def _searchable_rules(container: ServiceContainer) -> list[SourceRule]:
+    return [rule for rule in container.list_rules() if rule.enabled and rule.search is not None]
+
+
+def _validate_search_rule_id(rule_id: str, searchable_rules: list[SourceRule]) -> list[str] | None:
+    if not rule_id:
+        return None
+    available = {rule.id for rule in searchable_rules}
+    if rule_id in available:
+        return [rule_id]
+    available_ids = ", ".join(sorted(available)) if available else "none"
+    raise UserError(
+        "Unsupported search rule selection.",
+        detail=f"Rule id: {rule_id}\nAvailable searchable rules: {available_ids}",
+    )
+
+
+def _parse_limit(value: str) -> int:
+    try:
+        limit = int(value)
+    except ValueError as exc:
+        raise UserError(
+            "Search limit must be a positive integer.", detail=f"Limit: {value}"
+        ) from exc
+    if limit < 1:
+        raise UserError("Search limit must be a positive integer.", detail=f"Limit: {value}")
+    return min(limit, 100)
+
+
+def _search_summary(outcome: SearchOutcome) -> str:
+    count = len(outcome.results)
+    summary = f"{count} result{'s' if count != 1 else ''}"
+    if outcome.failures:
+        summary += f", {len(outcome.failures)} source(s) failed"
+    return summary
 
 
 def _env_flag(name: str, *, default: bool) -> bool:

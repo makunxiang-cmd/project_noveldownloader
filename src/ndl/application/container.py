@@ -4,19 +4,27 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
+from types import TracebackType
 
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from ndl.application.paths import library_db_path
-from ndl.application.services import ConvertService, DownloadService, LibraryService, UpdateService
+from ndl.application.paths import library_db_path, rules_dir
+from ndl.application.services import (
+    ConvertService,
+    DownloadService,
+    LibraryService,
+    RuleUpdateService,
+    SearchService,
+    UpdateService,
+)
 from ndl.converters import WriterRegistry, default_writer_registry
 from ndl.core.models import Novel
 from ndl.core.progress import ProgressCallback
 from ndl.core.protocols import Fetcher, Parser, Reader
-from ndl.fetchers import HttpFetcher
+from ndl.fetchers import BrowserFetcher, HttpFetcher
 from ndl.parsers import HtmlParser, TxtReader
-from ndl.rules import RuleResolver, SourceRule, load_builtin_rules
+from ndl.rules import RuleResolver, SourceRule, load_default_rules
 from ndl.storage import (
     LibraryRepository,
     create_database_engine,
@@ -41,7 +49,9 @@ class ServiceContainer:
         writer_registry: WriterRegistry | None = None,
         db_path: Path | None = None,
     ) -> None:
-        self._resolver = RuleResolver(rules if rules is not None else load_builtin_rules())
+        self._resolver = RuleResolver(
+            rules if rules is not None else load_default_rules(user_rules_path=rules_dir())
+        )
         self._fetcher_factory = fetcher_factory or _default_fetcher
         self._parser_factory = parser_factory or _default_parser
         self._readers = readers or {"txt": TxtReader()}
@@ -54,6 +64,10 @@ class ServiceContainer:
     def rule_for(self, url: str) -> SourceRule:
         """Resolve the SourceRule for `url`."""
         return self._resolver.resolve(url)
+
+    def list_rules(self) -> list[SourceRule]:
+        """Return loaded rules in resolution order."""
+        return self._resolver.list_rules()
 
     def fetcher_for(self, rule: SourceRule) -> Fetcher:
         """Build a Fetcher for `rule` using the configured factory."""
@@ -96,6 +110,17 @@ class ServiceContainer:
             self._library = LibraryService(LibraryRepository(self._ensure_sessions()))
         return self._library
 
+    def search_service(self) -> SearchService:
+        """Build a SearchService over all loaded rules that declare a search endpoint."""
+        return SearchService(
+            rules=self._resolver.list_rules(),
+            fetcher_factory=self.fetcher_for,
+        )
+
+    def rule_update_service(self) -> RuleUpdateService:
+        """Build a RuleUpdateService for the user-installed rules directory."""
+        return RuleUpdateService(rules_dir=rules_dir())
+
     def update_service(self, *, progress: ProgressCallback | None = None) -> UpdateService:
         """Build an UpdateService with configured rules and fetcher/parser factories."""
         return UpdateService(
@@ -105,6 +130,25 @@ class ServiceContainer:
             parser_factory=self.parser_for,
             progress=progress,
         )
+
+    def close(self) -> None:
+        """Dispose any database engine this container created."""
+        if self._engine is not None:
+            self._engine.dispose()
+            self._engine = None
+            self._sessions = None
+            self._library = None
+
+    def __enter__(self) -> ServiceContainer:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        self.close()
 
     def _ensure_sessions(self) -> sessionmaker[Session]:
         if self._sessions is None:
@@ -122,6 +166,8 @@ class ServiceContainer:
 
 
 def _default_fetcher(rule: SourceRule) -> Fetcher:
+    if rule.fetcher.type == "browser":
+        return BrowserFetcher(rule)
     return HttpFetcher(rule)
 
 

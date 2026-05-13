@@ -9,6 +9,7 @@ from ndl.application.container import ServiceContainer
 from ndl.application.services import ConvertService, LibraryService
 from ndl.core.models import Chapter, ChapterStub, Novel
 from ndl.core.protocols import Fetcher, Parser
+from ndl.fetchers import BrowserFetcher, HttpFetcher
 from ndl.rules.loader import load_builtin_rules
 from ndl.rules.schema import SourceRule
 
@@ -60,30 +61,46 @@ def test_container_resolves_rule_and_builds_dependencies() -> None:
     assert isinstance(container.parser_for(rule), DummyParser)
 
 
+def test_container_lists_loaded_rules_in_resolution_order() -> None:
+    container = ServiceContainer(rules=load_builtin_rules())
+
+    assert [rule.id for rule in container.list_rules()] == ["example_static"]
+
+
+def test_default_fetcher_uses_rule_fetcher_type() -> None:
+    http_rule = load_builtin_rules()[0]
+    browser_rule = http_rule.model_copy(
+        update={"fetcher": http_rule.fetcher.model_copy(update={"type": "browser"})}
+    )
+
+    assert isinstance(ServiceContainer(rules=[]).fetcher_for(http_rule), HttpFetcher)
+    assert isinstance(ServiceContainer(rules=[]).fetcher_for(browser_rule), BrowserFetcher)
+
+
 def test_container_builds_convert_service() -> None:
     assert isinstance(ServiceContainer(rules=[]).convert_service(), ConvertService)
 
 
 def test_container_library_service_is_singleton(tmp_path: Path) -> None:
-    container = ServiceContainer(rules=[], db_path=tmp_path / "lib.db")
-    first = container.library_service()
-    second = container.library_service()
-    assert isinstance(first, LibraryService)
-    assert first is second
+    with ServiceContainer(rules=[], db_path=tmp_path / "lib.db") as container:
+        first = container.library_service()
+        second = container.library_service()
+        assert isinstance(first, LibraryService)
+        assert first is second
 
 
 def test_container_library_service_persists_to_db_path(tmp_path: Path) -> None:
     db_path = tmp_path / "lib.db"
-    container = ServiceContainer(rules=[], db_path=db_path)
-    library = container.library_service()
-    novel = Novel(
-        title="T",
-        author="A",
-        source_url="https://example.com/x",
-        source_rule_id="example_static",
-        fetched_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
-        chapters=[Chapter(index=0, title="c", content="x")],
-    )
-    novel_id = library.save(novel)
-    assert db_path.exists()
-    assert library.get(novel_id) is not None
+    with ServiceContainer(rules=[], db_path=db_path) as container:
+        library = container.library_service()
+        novel = Novel(
+            title="T",
+            author="A",
+            source_url="https://example.com/x",
+            source_rule_id="example_static",
+            fetched_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            chapters=[Chapter(index=0, title="c", content="x")],
+        )
+        novel_id = library.save(novel)
+        assert db_path.exists()
+        assert library.get(novel_id) is not None

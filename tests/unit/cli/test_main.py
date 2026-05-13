@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import textwrap
 from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -16,11 +18,57 @@ from ndl import __version__
 from ndl.application.container import ServiceContainer
 from ndl.cli.main import _run_web_server, app
 from ndl.core.models import Chapter, Novel
+from ndl.fetchers import BrowserRuntimeDiagnostic
 
 runner = CliRunner()
 BASE_URL = "https://example-novels.test/book/123"
+RULE_MANIFEST_URL = "https://rules.example.test/manifest.yaml"
+REMOTE_RULE_URL = "https://rules.example.test/rules/remote_rule.yaml"
 REPO_ROOT = Path(__file__).parents[3]
 FIXTURE_DIR = REPO_ROOT / "tests" / "contract" / "fixtures" / "example_static"
+SEARCH_HTML = """
+<html><body>
+<div id="search-results">
+  <div class="result-item">
+    <span class="result-title">Journey to the West</span>
+    <span class="result-author">Wu Cheng'en</span>
+    <a class="result-link" href="/book/1">View</a>
+  </div>
+  <div class="result-item">
+    <span class="result-title">Dream of the Red Chamber</span>
+    <span class="result-author">Cao Xueqin</span>
+    <a class="result-link" href="/book/2">View</a>
+  </div>
+</div>
+</body></html>
+"""
+EMPTY_SEARCH_HTML = """
+<html><body>
+<div id="search-results"></div>
+</body></html>
+"""
+REMOTE_RULE_YAML = """
+id: remote_rule
+name: Remote Rule
+version: 1.0.0
+author: Tests
+priority: 25
+url_patterns:
+  - pattern: "https://remote.test/book/*"
+    type: glob
+index:
+  novel:
+    title: { selector: "h1" }
+    author: { selector: ".author" }
+  chapter_list:
+    container: "#chapters"
+    items: "a"
+    title: { selector: "self" }
+    url: { selector: "self", attr: "href" }
+chapter:
+  title: { selector: "h1" }
+  content: { selector: "#content", attr: "html" }
+"""
 
 
 def test_version_flag_outputs_version_string() -> None:
@@ -44,6 +92,37 @@ def test_module_entrypoint_exposes_cli_app() -> None:
     assert __main__.app is app
 
 
+def test_doctor_browser_reports_available_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_check() -> BrowserRuntimeDiagnostic:
+        return BrowserRuntimeDiagnostic(ok=True, message="Playwright Chromium is available.")
+
+    monkeypatch.setattr("ndl.cli.main.check_browser_runtime", fake_check)
+
+    result = runner.invoke(app, ["doctor", "browser"])
+
+    assert result.exit_code == 0, result.output
+    assert "Browser runtime: OK" in result.output
+    assert "Playwright Chromium is available." in result.output
+
+
+def test_doctor_browser_reports_missing_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_check() -> BrowserRuntimeDiagnostic:
+        return BrowserRuntimeDiagnostic(
+            ok=False,
+            message="Playwright Chromium is not available.",
+            detail="Run `playwright install chromium`.",
+        )
+
+    monkeypatch.setattr("ndl.cli.main.check_browser_runtime", fake_check)
+
+    result = runner.invoke(app, ["doctor", "browser"])
+
+    assert result.exit_code == 1
+    assert "Browser runtime: FAILED" in result.output
+    assert "Playwright Chromium is not available." in result.output
+    assert "playwright install chromium" in result.output
+
+
 def test_convert_command_writes_epub_from_txt(tmp_path) -> None:
     input_path = tmp_path / "book.txt"
     output_path = tmp_path / "book.epub"
@@ -61,6 +140,13 @@ def test_convert_command_writes_epub_from_txt(tmp_path) -> None:
         assert "OEBPS/Text/chapter_0001.xhtml" in archive.namelist()
 
 
+def test_rules_list_command_lists_loaded_rules(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["rules", "list"], env={"NDL_HOME": str(tmp_path / "ndl-home")})
+
+    assert result.exit_code == 0, result.output
+    assert "example_static" in result.output
+
+
 def test_rules_validate_command_accepts_builtin_rule() -> None:
     rule_path = REPO_ROOT / "src" / "ndl" / "builtin_rules" / "example_static.yaml"
 
@@ -68,6 +154,73 @@ def test_rules_validate_command_accepts_builtin_rule() -> None:
 
     assert result.exit_code == 0, result.output
     assert "Rule valid: example_static" in result.output
+
+
+@respx.mock
+def test_rules_update_writes_valid_remote_rules_after_confirmation(tmp_path: Path) -> None:
+    _mock_rule_manifest(REMOTE_RULE_YAML)
+
+    result = runner.invoke(
+        app,
+        ["rules", "update", "--manifest-url", RULE_MANIFEST_URL],
+        input="y\n",
+        env={"NDL_HOME": str(tmp_path / "ndl-home")},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "remote_rule" in result.output
+    assert "added" in result.output
+    assert "Updated 1 rule file" in result.output
+    installed = tmp_path / "ndl-home" / "rules" / "remote_rule.yaml"
+    assert installed.read_text(encoding="utf-8") == textwrap.dedent(REMOTE_RULE_YAML)
+
+
+@respx.mock
+def test_rules_update_aborts_without_confirmation(tmp_path: Path) -> None:
+    _mock_rule_manifest(REMOTE_RULE_YAML)
+
+    result = runner.invoke(
+        app,
+        ["rules", "update", "--manifest-url", RULE_MANIFEST_URL],
+        input="n\n",
+        env={"NDL_HOME": str(tmp_path / "ndl-home")},
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "Aborted." in result.output
+    assert not (tmp_path / "ndl-home" / "rules" / "remote_rule.yaml").exists()
+
+
+@respx.mock
+def test_rules_update_rejects_invalid_remote_rule_without_replacing(tmp_path: Path) -> None:
+    ndl_home = tmp_path / "ndl-home"
+    rules_dir = ndl_home / "rules"
+    rules_dir.mkdir(parents=True)
+    existing = "existing content"
+    installed = rules_dir / "remote_rule.yaml"
+    installed.write_text(existing, encoding="utf-8")
+    _mock_rule_manifest("id: remote_rule\n")
+
+    result = runner.invoke(
+        app,
+        ["rules", "update", "--manifest-url", RULE_MANIFEST_URL, "--yes"],
+        env={"NDL_HOME": str(ndl_home)},
+    )
+
+    assert result.exit_code == 1
+    assert "Rule schema validation failed" in result.output
+    assert installed.read_text(encoding="utf-8") == existing
+
+
+def test_rules_update_requires_manifest_url(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["rules", "update", "--yes"],
+        env={"NDL_HOME": str(tmp_path / "ndl-home")},
+    )
+
+    assert result.exit_code == 2
+    assert "Remote rule manifest URL is required." in result.output
 
 
 def test_download_requires_disclaimer_acceptance(tmp_path) -> None:
@@ -222,6 +375,59 @@ def test_run_web_server_uses_serve_factory_and_scheduler_env(
     assert os.environ["NDL_WEB_UPDATE_INTERVAL_HOURS"] == "12"
 
 
+@respx.mock
+def test_search_command_renders_mocked_results() -> None:
+    _mock_example_search("west", SEARCH_HTML)
+
+    result = runner.invoke(app, ["search", "west"])
+
+    assert result.exit_code == 0, result.output
+    assert "Public Domain Static Site Example" in result.output
+    assert "Journey to the West" in result.output
+    assert "Wu Cheng'en" in result.output
+    assert "https://example-novels.test/book/1" in result.output
+
+
+@respx.mock
+def test_search_command_supports_rule_filter_and_limit() -> None:
+    _mock_example_search("west", SEARCH_HTML)
+
+    result = runner.invoke(
+        app,
+        ["search", "west", "--rule", "example_static", "--limit", "1"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Journey to the West" in result.output
+    assert "Dream of the Red Chamber" not in result.output
+
+
+@respx.mock
+def test_search_command_prints_empty_state() -> None:
+    _mock_example_search("nothing", EMPTY_SEARCH_HTML)
+
+    result = runner.invoke(app, ["search", "nothing"])
+
+    assert result.exit_code == 0, result.output
+    assert "No search results." in result.output
+
+
+def test_search_command_rejects_empty_keyword() -> None:
+    result = runner.invoke(app, ["search", "   "])
+
+    assert result.exit_code == 2
+    assert "Search keyword cannot be empty." in result.output
+
+
+def test_search_command_rejects_unsupported_rule_id() -> None:
+    result = runner.invoke(app, ["search", "west", "--rule", "missing"])
+
+    assert result.exit_code == 2
+    assert "Unsupported search rule selection." in result.output
+    assert "missing" in result.output
+    assert "example_static" in result.output
+
+
 @pytest.fixture(autouse=True)
 def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     """Skip real sleeping in CLI download tests."""
@@ -374,40 +580,67 @@ def _mock_example_update() -> None:
     respx.get(f"{BASE_URL}/chapter/2").mock(return_value=httpx.Response(200, text=chapter_two))
 
 
-def _seed_library(ndl_home: Path) -> int:
-    service = ServiceContainer(rules=[], db_path=ndl_home / "library.db").library_service()
-    return service.save(
-        Novel(
-            title="Seed Novel",
-            author="Seed Author",
-            source_url="https://example.com/seed",
-            source_rule_id="example_static",
-            chapters=[
-                Chapter(index=0, title="First Chapter", content="secret body"),
-                Chapter(index=1, title="Second Chapter", content="more secret body"),
-            ],
-            fetched_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
-        )
+def _mock_example_search(keyword: str, html: str) -> None:
+    encoded_keyword = keyword.replace(" ", "+")
+    respx.get("https://example-novels.test/robots.txt").mock(
+        return_value=httpx.Response(200, text="User-agent: *\nAllow: /\n")
     )
+    respx.get(f"https://example-novels.test/search?q={encoded_keyword}").mock(
+        return_value=httpx.Response(200, text=html)
+    )
+
+
+def _mock_rule_manifest(rule_yaml: str) -> None:
+    digest = sha256(textwrap.dedent(rule_yaml).encode("utf-8")).hexdigest()
+    manifest = f"""
+version: 1
+rules:
+  - id: remote_rule
+    url: /rules/remote_rule.yaml
+    sha256: {digest}
+"""
+    respx.get(RULE_MANIFEST_URL).mock(
+        return_value=httpx.Response(200, text=textwrap.dedent(manifest))
+    )
+    respx.get(REMOTE_RULE_URL).mock(
+        return_value=httpx.Response(200, text=textwrap.dedent(rule_yaml))
+    )
+
+
+def _seed_library(ndl_home: Path) -> int:
+    with ServiceContainer(rules=[], db_path=ndl_home / "library.db") as container:
+        return container.library_service().save(
+            Novel(
+                title="Seed Novel",
+                author="Seed Author",
+                source_url="https://example.com/seed",
+                source_rule_id="example_static",
+                chapters=[
+                    Chapter(index=0, title="First Chapter", content="secret body"),
+                    Chapter(index=1, title="Second Chapter", content="more secret body"),
+                ],
+                fetched_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+            )
+        )
 
 
 def _seed_updatable_library(ndl_home: Path) -> int:
-    service = ServiceContainer(db_path=ndl_home / "library.db").library_service()
-    return service.save(
-        Novel(
-            title="Example Public Domain Novel",
-            author="Example Author",
-            source_url=BASE_URL,
-            source_rule_id="example_static",
-            status="ongoing",
-            chapters=[
-                Chapter(
-                    index=0,
-                    title="Chapter 1: Dawn",
-                    content="Morning arrived over the quiet archive.",
-                    source_url=f"{BASE_URL}/chapter/1",
-                )
-            ],
-            fetched_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+    with ServiceContainer(db_path=ndl_home / "library.db") as container:
+        return container.library_service().save(
+            Novel(
+                title="Example Public Domain Novel",
+                author="Example Author",
+                source_url=BASE_URL,
+                source_rule_id="example_static",
+                status="ongoing",
+                chapters=[
+                    Chapter(
+                        index=0,
+                        title="Chapter 1: Dawn",
+                        content="Morning arrived over the quiet archive.",
+                        source_url=f"{BASE_URL}/chapter/1",
+                    )
+                ],
+                fetched_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+            )
         )
-    )

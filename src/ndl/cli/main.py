@@ -14,13 +14,23 @@ from rich.table import Table
 
 from ndl import __version__
 from ndl.application.container import ServiceContainer
-from ndl.application.services import UpdateResult
+from ndl.application.paths import rules_dir
+from ndl.application.services import (
+    RuleUpdatePlan,
+    RuleUpdateService,
+    SearchFailure,
+    SearchOutcome,
+    UpdateResult,
+)
 from ndl.cli.disclaimer import ensure_download_disclaimer
 from ndl.cli.renderers import cli_progress
 from ndl.core.errors import InvalidArgumentError, NDLError, UserError
-from ndl.core.models import Novel
-from ndl.rules import load_rule_file
+from ndl.core.models import Novel, SearchResult
+from ndl.fetchers import BrowserRuntimeDiagnostic, check_browser_runtime
+from ndl.rules import SourceRule, load_rule_file
 from ndl.storage import NovelSummary
+
+_ENV_RULES_MANIFEST_URL = "NDL_RULES_MANIFEST_URL"
 
 app = typer.Typer(
     name="ndl",
@@ -30,6 +40,7 @@ app = typer.Typer(
 )
 rules_app = typer.Typer(help="Rule file utilities.", no_args_is_help=True)
 library_app = typer.Typer(help="Local library commands.", no_args_is_help=True)
+doctor_app = typer.Typer(help="Environment diagnostics.", no_args_is_help=True)
 
 
 def _version_callback(value: bool) -> None:
@@ -215,11 +226,41 @@ def update_command(
         raise typer.Exit(1)
 
 
+@app.command("search")
+def search_command(
+    keyword: Annotated[str, typer.Argument(help="Keyword to search for.")],
+    rule_ids: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--rule",
+            help="Restrict search to a rule id. Repeat for multiple rules.",
+        ),
+    ] = None,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", min=1, help="Maximum number of rows to print."),
+    ] = None,
+) -> None:
+    """Search rule-defined source indexes for a keyword."""
+    try:
+        outcome = asyncio.run(_search(keyword, rule_ids=rule_ids, limit=limit))
+    except NDLError as exc:
+        _raise_cli_error(exc)
+    console = _console()
+    if outcome.results:
+        console.print(_search_table(outcome.results))
+    else:
+        typer.echo("No search results.")
+    if outcome.failures:
+        console.print(_search_failure_table(outcome.failures))
+
+
 @library_app.command("list")
 def library_list() -> None:
     """List saved novels in the local library."""
     try:
-        summaries = ServiceContainer().library_service().list()
+        with ServiceContainer() as container:
+            summaries = container.library_service().list()
     except NDLError as exc:
         _raise_cli_error(exc)
     if not summaries:
@@ -250,18 +291,32 @@ def library_remove(
 ) -> None:
     """Remove a saved novel from the local library."""
     try:
-        container = ServiceContainer()
-        library = container.library_service()
-        novel = library.get(novel_id)
-        if novel is None:
-            raise UserError("Library entry not found.", detail=f"ID: {novel_id}")
+        with ServiceContainer() as container:
+            library = container.library_service()
+            novel = library.get(novel_id)
+            if novel is None:
+                raise UserError("Library entry not found.", detail=f"ID: {novel_id}")
+            if not yes and not typer.confirm(f"Remove '{novel.title}' from the library?"):
+                typer.echo("Aborted.")
+                raise typer.Exit(1)
+            library.remove(novel_id)
     except NDLError as exc:
         _raise_cli_error(exc)
-    if not yes and not typer.confirm(f"Remove '{novel.title}' from the library?"):
-        typer.echo("Aborted.")
-        raise typer.Exit(1)
-    library.remove(novel_id)
     typer.echo(f"Removed library entry: {novel_id}")
+
+
+@rules_app.command("list")
+def rules_list() -> None:
+    """List all loaded rules with their id, name, version, and capabilities."""
+    try:
+        with ServiceContainer() as container:
+            rules = container.list_rules()
+    except NDLError as exc:
+        _raise_cli_error(exc)
+    if not rules:
+        typer.echo("No rules loaded.")
+        return
+    _console().print(_rules_table(rules))
 
 
 @rules_app.command("validate")
@@ -285,8 +340,51 @@ def rules_validate(
     typer.echo(f"Rule valid: {rule.id}")
 
 
+@rules_app.command("update")
+def rules_update(
+    manifest_url: Annotated[
+        str | None,
+        typer.Option(
+            "--manifest-url",
+            help="Remote YAML/JSON manifest URL. May also be set with NDL_RULES_MANIFEST_URL.",
+        ),
+    ] = None,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Write validated rule updates without prompting."),
+    ] = False,
+) -> None:
+    """Fetch, validate, and install remote source rules."""
+    try:
+        resolved_manifest_url = _resolve_rules_manifest_url(manifest_url)
+        plan = asyncio.run(_plan_rule_update(resolved_manifest_url))
+        _console().print(_rule_update_table(plan))
+        if plan.changed_count == 0:
+            typer.echo("No rule updates to apply.")
+            return
+        if not yes and not typer.confirm(
+            f"Write {plan.changed_count} rule update(s) to {plan.rules_dir}?"
+        ):
+            typer.echo("Aborted.")
+            raise typer.Exit(1)
+        asyncio.run(_apply_rule_update(plan))
+    except NDLError as exc:
+        _raise_cli_error(exc)
+    typer.echo(f"Updated {plan.changed_count} rule file(s) in {plan.rules_dir}.")
+
+
+@doctor_app.command("browser")
+def doctor_browser() -> None:
+    """Check optional browser-fetcher dependencies and Chromium runtime."""
+    diagnostic = asyncio.run(check_browser_runtime())
+    _print_browser_diagnostic(diagnostic)
+    if not diagnostic.ok:
+        raise typer.Exit(1)
+
+
 app.add_typer(rules_app, name="rules")
 app.add_typer(library_app, name="library")
+app.add_typer(doctor_app, name="doctor")
 
 
 async def _download(
@@ -296,33 +394,82 @@ async def _download(
     target_format: str | None,
     save: bool,
 ) -> tuple[Path, int | None]:
-    container = ServiceContainer()
-    async with cli_progress() as progress:
-        novel = await container.download(url, progress=progress)
-        written = await container.convert_service(progress=progress).convert(
-            novel, output_path, target_format=target_format
-        )
-    novel_id = container.library_service().save(novel) if save else None
-    return written, novel_id
+    with ServiceContainer() as container:
+        async with cli_progress() as progress:
+            novel = await container.download(url, progress=progress)
+            written = await container.convert_service(progress=progress).convert(
+                novel, output_path, target_format=target_format
+            )
+        novel_id = container.library_service().save(novel) if save else None
+        return written, novel_id
 
 
 async def _convert(input_path: Path, output_path: Path, *, target_format: str | None) -> Path:
-    container = ServiceContainer()
-    async with cli_progress() as progress:
-        return await container.convert_service(progress=progress).convert(
-            input_path, output_path, target_format=target_format
-        )
+    with ServiceContainer() as container:
+        async with cli_progress() as progress:
+            return await container.convert_service(progress=progress).convert(
+                input_path, output_path, target_format=target_format
+            )
 
 
 async def _update_all() -> list[UpdateResult]:
-    container = ServiceContainer()
-    async with cli_progress() as progress:
-        return await container.update_service(progress=progress).update_all()
+    with ServiceContainer() as container:
+        async with cli_progress() as progress:
+            return await container.update_service(progress=progress).update_all()
+
+
+async def _search(
+    keyword: str,
+    *,
+    rule_ids: list[str] | None,
+    limit: int | None,
+) -> SearchOutcome:
+    normalized_keyword = keyword.strip()
+    if not normalized_keyword:
+        raise InvalidArgumentError("Search keyword cannot be empty.")
+
+    selected_rule_ids = _normalize_search_rule_ids(rule_ids)
+    with ServiceContainer() as container:
+        searchable_rules = [
+            rule for rule in container.list_rules() if rule.enabled and rule.search is not None
+        ]
+        _validate_search_rule_ids(selected_rule_ids, searchable_rules)
+        outcome = await container.search_service().search(
+            normalized_keyword,
+            rule_ids=selected_rule_ids or None,
+        )
+    if limit is not None:
+        return SearchOutcome(results=outcome.results[:limit], failures=outcome.failures)
+    return outcome
+
+
+async def _plan_rule_update(manifest_url: str) -> RuleUpdatePlan:
+    service = RuleUpdateService(rules_dir=rules_dir())
+    try:
+        return await service.plan_update(manifest_url)
+    finally:
+        await service.aclose()
+
+
+async def _apply_rule_update(plan: RuleUpdatePlan) -> None:
+    service = RuleUpdateService(rules_dir=rules_dir())
+    try:
+        service.apply_update(plan)
+    finally:
+        await service.aclose()
 
 
 def _raise_cli_error(exc: NDLError) -> NoReturn:
     typer.echo(exc.user_message(), err=True)
     raise typer.Exit(exc.exit_code)
+
+
+def _print_browser_diagnostic(diagnostic: BrowserRuntimeDiagnostic) -> None:
+    status = "OK" if diagnostic.ok else "FAILED"
+    typer.echo(f"Browser runtime: {status}")
+    typer.echo(diagnostic.message)
+    if diagnostic.detail:
+        typer.echo(diagnostic.detail)
 
 
 def _validate_serve_host(host: str, *, allow_public_host: bool) -> None:
@@ -365,7 +512,8 @@ def _run_web_server(
 
 
 def _load_library_novel(novel_id: int) -> Novel:
-    novel = ServiceContainer().library_service().get(novel_id)
+    with ServiceContainer() as container:
+        novel = container.library_service().get(novel_id)
     if novel is None:
         raise UserError("Library entry not found.", detail=f"ID: {novel_id}")
     return novel
@@ -412,6 +560,110 @@ def _update_table(results: list[UpdateResult]) -> Table:
             str(result.new_chapter_count),
             str(result.total_chapter_count),
             result.message or "",
+        )
+    return table
+
+
+def _search_table(results: list[SearchResult]) -> Table:
+    table = Table()
+    table.add_column("source")
+    table.add_column("title")
+    table.add_column("author")
+    table.add_column("url")
+    for result in results:
+        table.add_row(
+            result.source_name,
+            result.title,
+            result.author or "",
+            result.url,
+        )
+    return table
+
+
+def _search_failure_table(failures: list[SearchFailure]) -> Table:
+    table = Table(title="Search failures")
+    table.add_column("rule")
+    table.add_column("source")
+    table.add_column("message")
+    for failure in failures:
+        table.add_row(failure.rule_id, failure.source_name, failure.message)
+    return table
+
+
+def _normalize_search_rule_ids(rule_ids: list[str] | None) -> list[str]:
+    normalized: list[str] = []
+    for rule_id in rule_ids or []:
+        stripped = rule_id.strip()
+        if not stripped:
+            raise InvalidArgumentError("Search rule id cannot be empty.")
+        normalized.append(stripped)
+    return normalized
+
+
+def _validate_search_rule_ids(rule_ids: list[str], searchable_rules: list[SourceRule]) -> None:
+    available_ids = {rule.id for rule in searchable_rules}
+    unsupported = sorted(set(rule_ids) - available_ids)
+    if not unsupported:
+        return
+    available = ", ".join(sorted(available_ids)) if available_ids else "none"
+    raise InvalidArgumentError(
+        "Unsupported search rule selection.",
+        detail=(
+            f"Unsupported rule id(s): {', '.join(unsupported)}\n"
+            f"Available searchable rules: {available}"
+        ),
+    )
+
+
+def _resolve_rules_manifest_url(value: str | None) -> str:
+    resolved = (value or os.environ.get(_ENV_RULES_MANIFEST_URL) or "").strip()
+    if not resolved:
+        raise InvalidArgumentError(
+            "Remote rule manifest URL is required.",
+            detail=(
+                "Pass --manifest-url or set NDL_RULES_MANIFEST_URL. "
+                "NDL does not ship a default remote rule feed yet."
+            ),
+        )
+    return resolved
+
+
+def _rules_table(rules: list[SourceRule]) -> Table:
+    table = Table()
+    table.add_column("id")
+    table.add_column("name")
+    table.add_column("version")
+    table.add_column("enabled")
+    table.add_column("search")
+    table.add_column("fetcher")
+    table.add_column("patterns", justify="right")
+    for rule in rules:
+        table.add_row(
+            rule.id,
+            rule.name,
+            rule.version,
+            "yes" if rule.enabled else "no",
+            "yes" if rule.search is not None else "no",
+            rule.fetcher.type,
+            str(len(rule.url_patterns)),
+        )
+    return table
+
+
+def _rule_update_table(plan: RuleUpdatePlan) -> Table:
+    table = Table()
+    table.add_column("status")
+    table.add_column("id")
+    table.add_column("name")
+    table.add_column("version")
+    table.add_column("target")
+    for item in plan.items:
+        table.add_row(
+            item.status,
+            item.rule.id,
+            item.rule.name,
+            item.rule.version,
+            str(item.target_path),
         )
     return table
 

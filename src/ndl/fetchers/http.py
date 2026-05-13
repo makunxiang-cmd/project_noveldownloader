@@ -11,9 +11,10 @@ from urllib.parse import urlparse
 import httpx
 
 from ndl.core.errors import HTTPError, NDLError, NetworkError, RateLimitedError
+from ndl.fetchers._common import backoff_delay, resolve_headers
 from ndl.fetchers._robots import RobotsChecker
 from ndl.fetchers._throttle import HostThrottle
-from ndl.rules.schema import RetryRule, SourceRule
+from ndl.rules.schema import SourceRule
 
 _RETRY_AFTER_CAP_SECONDS = 60.0
 
@@ -32,7 +33,7 @@ class HttpFetcher:
         self._owns_client = client is None
         self._client = client or httpx.AsyncClient(timeout=timeout, follow_redirects=True)
         self._throttles: dict[str, HostThrottle] = {}
-        self._headers = _resolve_headers(rule)
+        self._headers = resolve_headers(rule)
         self._user_agent = self._headers["User-Agent"]
         self._robots: RobotsChecker | None = (
             RobotsChecker(client=self._client, user_agent=self._user_agent)
@@ -103,7 +104,7 @@ class HttpFetcher:
                 else:
                     return response
             if attempt + 1 < retry.attempts:
-                delay = next_delay if next_delay is not None else _backoff_delay(retry, attempt)
+                delay = next_delay if next_delay is not None else backoff_delay(retry, attempt)
                 await asyncio.sleep(delay)
         assert last_exc is not None
         raise last_exc
@@ -113,14 +114,6 @@ class HttpFetcher:
         if chosen == "auto":
             return response.text
         return response.content.decode(chosen, errors="replace")
-
-
-def _resolve_headers(rule: SourceRule) -> dict[str, str]:
-    """Return request headers with a guaranteed User-Agent matching robots checks."""
-    headers = dict(rule.fetcher.headers)
-    if not any(key.lower() == "user-agent" for key in headers):
-        headers["User-Agent"] = f"ndl/{rule.id}"
-    return headers
 
 
 def _retry_after_seconds(response: httpx.Response) -> float | None:
@@ -142,9 +135,3 @@ def _retry_after_seconds(response: httpx.Response) -> float | None:
     if seconds <= 0:
         return 0.0
     return min(seconds, _RETRY_AFTER_CAP_SECONDS)
-
-
-def _backoff_delay(retry: RetryRule, attempt: int) -> float:
-    if retry.backoff == "fixed":
-        return 1.0
-    return 2.0**attempt
