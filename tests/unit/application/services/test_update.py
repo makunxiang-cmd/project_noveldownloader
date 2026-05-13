@@ -51,55 +51,125 @@ async def test_update_all_appends_only_missing_chapters(tmp_path: Path) -> None:
             f"{BASE_URL}/chapter/2": chapter_two,
         }
     )
-    container = ServiceContainer(
+    with ServiceContainer(
         rules=[rule],
         fetcher_factory=lambda _rule: fetcher,
         db_path=tmp_path / "library.db",
+    ) as container:
+        library = container.library_service()
+        novel_id = library.save(_stored_novel())
+        events: list[ProgressEvent] = []
+
+        async def progress(event: ProgressEvent) -> None:
+            events.append(event)
+
+        results = await container.update_service(progress=progress).update_all()
+
+        assert len(results) == 1
+        assert results[0].status == "updated"
+        assert results[0].new_chapter_count == 1
+        assert results[0].total_chapter_count == 2
+        assert fetcher.requests == [BASE_URL, f"{BASE_URL}/chapter/2"]
+        assert fetcher.closed is True
+
+        stored = library.get(novel_id)
+        assert stored is not None
+        assert [chapter.title for chapter in stored.chapters] == [
+            "Chapter 1: Dawn",
+            "Chapter 2: Noon",
+        ]
+        assert stored.last_updated is not None
+        assert [event.kind for event in events] == ["stage", "stage", "chapter", "stage", "done"]
+
+
+@pytest.mark.asyncio
+async def test_update_all_reuses_fetcher_across_novels_with_same_rule(tmp_path: Path) -> None:
+    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    index_html = (FIXTURE_DIR / "index.html").read_text(encoding="utf-8")
+    chapter_two = (
+        (FIXTURE_DIR / "chapter.html")
+        .read_text(encoding="utf-8")
+        .replace("Chapter 1: Dawn", "Chapter 2: Noon")
     )
-    library = container.library_service()
-    novel_id = library.save(_stored_novel())
-    events: list[ProgressEvent] = []
+    fetcher = FakeFetcher(
+        {
+            BASE_URL: index_html,
+            BASE_URL + "?b=1": index_html,
+            f"{BASE_URL}/chapter/2": chapter_two,
+        }
+    )
+    built_count = 0
 
-    async def progress(event: ProgressEvent) -> None:
-        events.append(event)
+    def factory(_rule: object) -> FakeFetcher:
+        nonlocal built_count
+        built_count += 1
+        return fetcher
 
-    results = await container.update_service(progress=progress).update_all()
+    with ServiceContainer(
+        rules=[rule],
+        fetcher_factory=factory,
+        db_path=tmp_path / "library.db",
+    ) as container:
+        library = container.library_service()
+        novel_a = Novel(
+            title="A",
+            author="A",
+            source_url=BASE_URL,
+            source_rule_id="example_static",
+            status="ongoing",
+            chapters=[
+                Chapter(
+                    index=0,
+                    title="Chapter 1: Dawn",
+                    content="x",
+                    source_url=f"{BASE_URL}/chapter/1",
+                )
+            ],
+            fetched_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        )
+        library.save(novel_a)
+        novel_b = Novel(
+            title="B",
+            author="A",
+            source_url=BASE_URL + "?b=1",
+            source_rule_id="example_static",
+            status="ongoing",
+            chapters=[
+                Chapter(
+                    index=0,
+                    title="Chapter 1: Dawn",
+                    content="x",
+                    source_url=f"{BASE_URL}/chapter/1",
+                )
+            ],
+            fetched_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        )
+        library.save(novel_b)
 
-    assert len(results) == 1
-    assert results[0].status == "updated"
-    assert results[0].new_chapter_count == 1
-    assert results[0].total_chapter_count == 2
-    assert fetcher.requests == [BASE_URL, f"{BASE_URL}/chapter/2"]
+        await container.update_service().update_all()
+
+    assert built_count == 1
     assert fetcher.closed is True
-
-    stored = library.get(novel_id)
-    assert stored is not None
-    assert [chapter.title for chapter in stored.chapters] == [
-        "Chapter 1: Dawn",
-        "Chapter 2: Noon",
-    ]
-    assert stored.last_updated is not None
-    assert [event.kind for event in events] == ["stage", "stage", "chapter", "stage", "done"]
 
 
 @pytest.mark.asyncio
 async def test_update_all_skips_completed_and_sourceless_entries(tmp_path: Path) -> None:
     rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
     fetcher = FakeFetcher({})
-    container = ServiceContainer(
+    with ServiceContainer(
         rules=[rule],
         fetcher_factory=lambda _rule: fetcher,
         db_path=tmp_path / "library.db",
-    )
-    library = container.library_service()
-    library.save(_stored_novel(status="completed"))
-    library.save(_stored_novel(source_url=None))
+    ) as container:
+        library = container.library_service()
+        library.save(_stored_novel(status="completed"))
+        library.save(_stored_novel(source_url=None))
 
-    results = await container.update_service().update_all()
+        results = await container.update_service().update_all()
 
-    assert results == []
-    assert fetcher.requests == []
-    assert fetcher.closed is False
+        assert results == []
+        assert fetcher.requests == []
+        assert fetcher.closed is False
 
 
 def _stored_novel(

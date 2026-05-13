@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from sqlalchemy import inspect, text
+from sqlalchemy import Engine, inspect, text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
 
 from ndl.storage import (
     ChapterRow,
@@ -26,18 +28,38 @@ def db_path(tmp_path: Path) -> Path:
     return tmp_path / "library.db"
 
 
-def test_init_schema_creates_all_tables(db_path: Path) -> None:
+@pytest.fixture
+def engine(db_path: Path) -> Iterator[Engine]:
     engine = create_database_engine(db_path)
     init_schema(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 
+
+@pytest.fixture
+def memory_engine() -> Iterator[Engine]:
+    engine = create_database_engine()
+    init_schema(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture
+def factory(engine: Engine) -> sessionmaker[Session]:
+    return create_session_factory(engine)
+
+
+def test_init_schema_creates_all_tables(engine: Engine) -> None:
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
     assert {"novels", "chapters", "download_jobs", "settings"} <= tables
 
 
-def test_pragmas_applied_on_file_engine(db_path: Path) -> None:
-    engine = create_database_engine(db_path)
-    init_schema(engine)
+def test_pragmas_applied_on_file_engine(engine: Engine) -> None:
     with engine.connect() as conn:
         journal_mode = conn.execute(text("PRAGMA journal_mode")).scalar_one()
         foreign_keys = conn.execute(text("PRAGMA foreign_keys")).scalar_one()
@@ -45,19 +67,13 @@ def test_pragmas_applied_on_file_engine(db_path: Path) -> None:
     assert int(foreign_keys) == 1
 
 
-def test_in_memory_engine_applies_pragmas() -> None:
-    engine = create_database_engine()
-    init_schema(engine)
-    with engine.connect() as conn:
+def test_in_memory_engine_applies_pragmas(memory_engine: Engine) -> None:
+    with memory_engine.connect() as conn:
         foreign_keys = conn.execute(text("PRAGMA foreign_keys")).scalar_one()
     assert int(foreign_keys) == 1
 
 
-def test_session_scope_persists_novel_and_chapter(db_path: Path) -> None:
-    engine = create_database_engine(db_path)
-    init_schema(engine)
-    factory = create_session_factory(engine)
-
+def test_session_scope_persists_novel_and_chapter(factory: sessionmaker[Session]) -> None:
     fetched_at = datetime.now(timezone.utc)
     with session_scope(factory) as session:
         novel = NovelRow(
@@ -94,11 +110,7 @@ def test_session_scope_persists_novel_and_chapter(db_path: Path) -> None:
         assert loaded.tags == ["a", "b"]
 
 
-def test_chapter_unique_per_novel_index(db_path: Path) -> None:
-    engine = create_database_engine(db_path)
-    init_schema(engine)
-    factory = create_session_factory(engine)
-
+def test_chapter_unique_per_novel_index(factory: sessionmaker[Session]) -> None:
     fetched_at = datetime.now(timezone.utc)
     session = factory()
     try:
@@ -121,11 +133,7 @@ def test_chapter_unique_per_novel_index(db_path: Path) -> None:
         session.close()
 
 
-def test_chapter_cascade_delete(db_path: Path) -> None:
-    engine = create_database_engine(db_path)
-    init_schema(engine)
-    factory = create_session_factory(engine)
-
+def test_chapter_cascade_delete(factory: sessionmaker[Session]) -> None:
     fetched_at = datetime.now(timezone.utc)
     with session_scope(factory) as session:
         session.add(
@@ -148,11 +156,7 @@ def test_chapter_cascade_delete(db_path: Path) -> None:
         assert session.query(ChapterRow).count() == 0
 
 
-def test_settings_kv_round_trip(db_path: Path) -> None:
-    engine = create_database_engine(db_path)
-    init_schema(engine)
-    factory = create_session_factory(engine)
-
+def test_settings_kv_round_trip(factory: sessionmaker[Session]) -> None:
     with session_scope(factory) as session:
         session.add(SettingRow(key="library.path", value={"path": "/tmp/x"}))
 
@@ -162,11 +166,7 @@ def test_settings_kv_round_trip(db_path: Path) -> None:
         assert row.value == {"path": "/tmp/x"}
 
 
-def test_download_job_status_check_constraint(db_path: Path) -> None:
-    engine = create_database_engine(db_path)
-    init_schema(engine)
-    factory = create_session_factory(engine)
-
+def test_download_job_status_check_constraint(factory: sessionmaker[Session]) -> None:
     started_at = datetime.now(timezone.utc)
     with session_scope(factory) as session:
         session.add(DownloadJobRow(status="running", started_at=started_at, progress={}))

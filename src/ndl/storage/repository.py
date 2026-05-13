@@ -36,16 +36,19 @@ class LibraryRepository:
         self._sessions = session_factory
 
     def save(self, novel: Novel) -> int:
-        """Insert or upsert `novel` (matched on source_rule_id + source_url) and return its id."""
+        """Insert or upsert `novel` (matched on source_rule_id + source_url) and return its id.
+
+        Append-only on chapters: existing chapters are preserved by index so a re-download
+        that returns fewer or fixed-content chapters cannot delete stored data.
+        """
         with self._sessions() as session, session.begin():
             row = self._find_existing(session, novel)
             if row is None:
                 row = NovelRow()
                 session.add(row)
+                self._populate_new_row(novel, row)
             else:
-                row.chapters.clear()
-                session.flush()
-            self._apply_novel_to_row(novel, row)
+                self._merge_into_existing(novel, row)
             session.flush()
             return row.id
 
@@ -124,7 +127,29 @@ class LibraryRepository:
         return session.execute(stmt).scalar_one_or_none()
 
     @staticmethod
-    def _apply_novel_to_row(novel: Novel, row: NovelRow) -> None:
+    def _populate_new_row(novel: Novel, row: NovelRow) -> None:
+        LibraryRepository._apply_metadata(novel, row)
+        row.fetched_at = novel.fetched_at
+        row.last_updated = novel.last_updated
+        row.chapters = [_chapter_to_row(chapter, novel.fetched_at) for chapter in novel.chapters]
+
+    @staticmethod
+    def _merge_into_existing(novel: Novel, row: NovelRow) -> None:
+        LibraryRepository._apply_metadata(novel, row)
+        existing_indices = {chapter.index for chapter in row.chapters}
+        new_chapters = [
+            _chapter_to_row(chapter, novel.fetched_at)
+            for chapter in novel.chapters
+            if chapter.index not in existing_indices
+        ]
+        if new_chapters:
+            row.chapters.extend(new_chapters)
+            row.last_updated = novel.fetched_at
+        elif novel.last_updated is not None:
+            row.last_updated = novel.last_updated
+
+    @staticmethod
+    def _apply_metadata(novel: Novel, row: NovelRow) -> None:
         row.title = novel.title
         row.author = novel.author
         row.source_url = novel.source_url
@@ -134,9 +159,6 @@ class LibraryRepository:
         row.cover_blob = novel.cover_data
         row.tags = list(novel.tags)
         row.status = novel.status
-        row.fetched_at = novel.fetched_at
-        row.last_updated = novel.last_updated
-        row.chapters = [_chapter_to_row(chapter, novel.fetched_at) for chapter in novel.chapters]
 
 
 def _chapter_to_row(chapter: Chapter, fetched_at: datetime) -> ChapterRow:

@@ -97,6 +97,62 @@ def test_save_is_upsert_on_rule_and_url(
         assert session.query(ChapterRow).count() == 4
 
 
+def test_save_preserves_existing_chapters_when_redownload_returns_fewer(
+    repo: LibraryRepository,
+) -> None:
+    first = _make_novel(chapter_count=3)
+    first_id = repo.save(first)
+    first_loaded = repo.get(first_id)
+    assert first_loaded is not None
+    original_titles = [chapter.title for chapter in first_loaded.chapters]
+
+    shrunk = Novel(
+        title="Renamed",
+        author="Author A",
+        source_url="https://example.com/book/1",
+        source_rule_id="example_static",
+        chapters=[Chapter(index=0, title="Only Chapter", content="short")],
+        fetched_at=datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc),
+    )
+    repo.save(shrunk)
+
+    loaded = repo.get(first_id)
+    assert loaded is not None
+    assert loaded.title == "Renamed"
+    assert len(loaded.chapters) == 3
+    assert [chapter.title for chapter in loaded.chapters] == original_titles
+
+
+def test_save_preserves_original_fetched_at_on_upsert(repo: LibraryRepository) -> None:
+    first_fetched = datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)
+    first = Novel(
+        title="T",
+        author="A",
+        source_url="https://example.com/book/1",
+        source_rule_id="example_static",
+        chapters=[Chapter(index=0, title="C0", content="x")],
+        fetched_at=first_fetched,
+    )
+    first_id = repo.save(first)
+
+    second = Novel(
+        title="T",
+        author="A",
+        source_url="https://example.com/book/1",
+        source_rule_id="example_static",
+        chapters=[
+            Chapter(index=0, title="C0", content="x"),
+            Chapter(index=1, title="C1", content="y"),
+        ],
+        fetched_at=datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc),
+    )
+    repo.save(second)
+
+    summary = next(item for item in repo.list() if item.id == first_id)
+    assert summary.fetched_at.replace(tzinfo=timezone.utc) == first_fetched
+    assert summary.last_updated is not None
+
+
 def test_save_without_source_url_always_inserts(repo: LibraryRepository) -> None:
     a = _make_novel(source_url=None, title="Local A")
     b = _make_novel(source_url=None, title="Local B")
