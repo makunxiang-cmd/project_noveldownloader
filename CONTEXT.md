@@ -11,12 +11,14 @@ a signal to either reconsider naming or extend this glossary intentionally.
 | **Novel** | The single in-memory representation of a complete book (`ndl.core.models.Novel`). All flows — download, TXT/EPUB read, library read, format conversion — converge on `Novel` as the intermediate representation (IR). Formats never convert directly to one another. |
 | **Chapter** | A fully fetched chapter in normalized plain-text form (`ndl.core.models.Chapter`). `index` is zero-based and unique within a Novel; chapters in a Novel are stored sorted by index. |
 | **ChapterStub** | An index-page entry containing only `index`, `title`, and `url`. Produced by index parsing before chapter bodies are fetched. |
+| **SearchResult** | A single search hit returned by a rule-driven keyword search (`ndl.core.models.SearchResult`). Fields: `title`, `author?`, `url`, `source_rule_id`, `source_name`. |
+| **SearchOutcome** | The full result of `SearchService.search(keyword, rule_ids=None)`: a list of `SearchResult` plus a list of `SearchFailure(rule_id, source_name, message)`. One failing source no longer aborts the multi-source search — its error becomes a `SearchFailure` while other sources' hits are preserved. |
 
 ## Pipeline roles (Protocols)
 
 | Term | Definition |
 |---|---|
-| **Fetcher** | Async role that turns a URL into response text (`ndl.core.protocols.Fetcher`). The default implementation is `HttpFetcher`, which honors per-host rate limits, retries, robots.txt, and rule-driven encoding. Browser-backed fetchers are P6+. |
+| **Fetcher** | Async role that turns a URL into response text (`ndl.core.protocols.Fetcher`). The default implementation is `HttpFetcher`, which honors per-host rate limits, retries, robots.txt, and rule-driven encoding. `BrowserFetcher` is available when a rule declares `fetcher.type: browser` and the optional `browser` extra plus Chromium runtime are installed. |
 | **Parser** | Role that turns fetched HTML into domain objects (`ndl.core.protocols.Parser`). `HtmlParser` binds a `SourceRule` to this Protocol. |
 | **Writer** | Role that serializes a `Novel` into an output format (`ndl.core.protocols.Writer`). Implementations: `TxtWriter`, `EpubWriter`. |
 | **Reader** | Role that hydrates a file back into a `Novel` (`ndl.core.protocols.Reader`). Implementations: `TxtReader`. EPUB / JSON readers are roadmap items. |
@@ -41,7 +43,7 @@ a signal to either reconsider naming or extend this glossary intentionally.
 
 | Term | Definition |
 |---|---|
-| **Onion / clean layering** | Source code is organized into four layers: `core/` (domain), infrastructure (`fetchers/` / `parsers/` / `converters/` / `rules/` / `storage/`), `application/` (services + container), and the delivery surface (`cli/`, future `web/`). Inner layers do not import outer layers. |
+| **Onion / clean layering** | Source code is organized into four layers: `core/` (domain), infrastructure (`fetchers/` / `parsers/` / `converters/` / `rules/` / `storage/` / `scheduler/`), `application/` (services + container), and the delivery surface (`cli/`, `web/`). Inner layers do not import outer layers. |
 | **Flat src-layout** | Implementation detail: there is no `infrastructure/` directory; the infrastructure modules live directly under `src/ndl/`. See ADR-0001. |
 | **ServiceContainer** | The single entry point that resolves rules and wires fetchers, parsers, readers, writers, and the convert service (`ndl.application.container.ServiceContainer`). CLI and Web both compose through it. |
 

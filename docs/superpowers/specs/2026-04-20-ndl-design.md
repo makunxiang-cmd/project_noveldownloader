@@ -11,7 +11,7 @@
 | License | MIT |
 | 设计文档版本 | 1.0 |
 
-> Implementation status, 2026-05-01: P0 through P4 are implemented, covering scaffold, download/convert MVP, library persistence, local Web UI, and update scheduling. P5 search and remote rule management is the active next milestone. For current handoff state, read `docs/superpowers/SESSION-STATE.md`.
+> Implementation status, 2026-05-13: P0 through P6 are implemented, covering scaffold, download/convert MVP, library persistence, local Web UI, update scheduling, rule-defined search, remote rule updates, Web search, optional browser rendering, browser diagnostics, and release hardening. P7.1 distribution verification is implemented; for current handoff state, read `docs/superpowers/SESSION-STATE.md`.
 
 ---
 
@@ -36,14 +36,14 @@ NDL 是一个以 **Python 3.10+** 为基础的**中文小说下载与格式转�
 | 2 | 目标站点 | 纯规则驱动（YAML），不硬编码任何站点 | 开源可持续：社区零代码贡献新源 |
 | 3 | 输出格式 | TXT + EPUB；`ndl convert` 独立子命令 | 中文电子书事实标准；PDF/MOBI 后续 PR |
 | 4 | JavaScript 渲染 | HTTP 默认；Playwright 作为 `ndl[browser]` 可选 extras | 降低首装门槛，保留高级能力 |
-| 5 | 状态管理 | SQLite + 追更功能，`platformdirs` 规范路径 | Web UI 前提；连载小说刚需 |
-| 6a | Web 前端 | HTMX + Jinja2 + SSE | 纯 Python 栈，零 Node.js 构建 |
+| 5 | 状态管理 | SQLite + 追更功能，`NDL_HOME` 路径 helper | Web UI 前提；连载小说刚需 |
+| 6a | Web 前端 | Jinja2 + SSE + 少量原生 JavaScript | 纯 Python 栈，零 Node.js 构建 |
 | 6b | 追更触发 | APScheduler 随 `ndl serve` 运行 + 手动 `ndl update` | 无守护进程负担 |
 | 7a | 规则分发 | 三级加载：打包内置 + 远程仓库 + 用户自定义 | 即装可用 + 可升级 + 可私有 |
 | 7b | 法律伦理 | 免责声明 + robots.txt 默认尊重 + 强制限速 | 开源爬虫项目社会契约 |
 | 8a | Python 版本 | 3.10+ | `match` 语法在规则解析中使用 |
 | 8b | 国际化 | 中英双语（babel） | 触达海外华人与国际用户 |
-| 8c | 发布形态 | MVP 仅 PyPI；v1.0 加 Docker | 先跑起来再扩展 |
+| 8c | 发布形态 | v0.1 先准备 PyPI 发布；v1.0 加 Docker | 先跑起来再扩展 |
 | 9 | 代码组织 | 分层 src-layout（方案 B） | 2025 年 Python 开源事实标准 |
 | 10 | License | MIT | 爬虫工具最合理的许可形式 |
 
@@ -61,7 +61,7 @@ NDL 是一个以 **Python 3.10+** 为基础的**中文小说下载与格式转�
 ```
  ┌──────────────────────────────────────────────────┐
  │  cli/        web/                                │  交付层
- │  (Typer)     (FastAPI+HTMX+SSE)                  │
+ │  (Typer)     (FastAPI+Jinja2+SSE)                │
  ├──────────────────────────────────────────────────┤
  │  application/  services: Download | Convert      │  用例层
  │                          | Update | Library      │
@@ -94,7 +94,7 @@ NDL 是一个以 **Python 3.10+** 为基础的**中文小说下载与格式转�
 | 结构化日志 | `src/ndl/logging.py` (structlog) | JSON 输出，issue 反馈友好 |
 | 配置 | `src/ndl/config/` (pydantic-settings) | 合并顺序：默认值 → TOML → env → CLI 参数 |
 | 国际化 | `src/ndl/i18n/locale/{zh_CN,en_US}/LC_MESSAGES/ndl.po` | babel + gettext |
-| 路径 | `src/ndl/config/paths.py` (platformdirs) | 跨平台用户目录封装 |
+| 路径 | `src/ndl/application/paths.py` (`NDL_HOME`) | 当前实现的用户目录封装；`platformdirs` 可在后续计划中评估 |
 
 ### 2.4 技术选型一览
 
@@ -107,7 +107,7 @@ NDL 是一个以 **Python 3.10+** 为基础的**中文小说下载与格式转�
 | 数据建模 | `pydantic v2` | 规则 Schema + FastAPI 原生 |
 | ORM | `SQLAlchemy 2.0` Mapped 风格 | 类型注解友好 |
 | CLI 框架 | `typer` | 装饰器式；类型驱动 |
-| Web 框架 | `fastapi` + `jinja2` + `htmx` + `sse-starlette` | 零 JS 构建链 |
+| Web 框架 | `fastapi` + `jinja2` + native EventSource + `sse-starlette` | 零 JS 构建链 |
 | 任务调度 | `apscheduler` AsyncIOScheduler | 与 FastAPI loop 共享 |
 | EPUB 生成 | `ebooklib` | 最成熟的纯 Python EPUB 库 |
 | 包管理 | `uv`（推荐）+ `hatchling` 后端 | 2025 年 Python 工具链首选 |
@@ -197,17 +197,15 @@ chapter:
 
 **分离结构与清洗的意义**：结构选择器（标题在哪）罕有失效；清洗模式（广告关键字）经常更新。分离后用户仅修 `strip_patterns` 而不碰整份规则。
 
-### 3.4 规则三级加载优先级
+### 3.4 规则加载优先级
 
 ```
 src/ndl/builtin_rules/*.yaml          (打包内置，示例/样板)
      ↓
-~/.ndl/rules/*.yaml                   (`ndl rules update` 拉取的远程规则)
-     ↓
-~/.ndl/rules/custom/*.yaml            (用户手写；不受远程更新覆盖)
+<NDL_HOME>/rules/*.yaml               (`ndl rules update` 拉取，或用户手动放置)
 ```
 
-同 `id` 高优先级覆盖低优先级。用户无需 fork 官方仓库即可"打补丁"。
+同 `id` 的用户规则覆盖内置规则。更细的 `custom/` 三级覆盖目录仍是未来规则管理界面的候选能力，当前实现没有递归加载子目录。
 
 ### 3.5 规则引擎执行流（下载场景）
 
@@ -462,7 +460,7 @@ Web UI 使用 `web/templates/partials/error_card.html`，结构字段与 CLI 一
 ```
 project_noveldownloader/
 ├── .github/
-│   ├── workflows/              # ci.yml, release.yml, rules-sync.yml
+│   ├── workflows/              # ci.yml
 │   ├── ISSUE_TEMPLATE/         # bug_report / rule_request / feature_request
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── docs/
@@ -479,27 +477,15 @@ project_noveldownloader/
 │   ├── fetchers/               # base, http, browser*, rate_limiter, robots, factory
 │   ├── parsers/                # html_index, html_chapter, txt_reader
 │   ├── converters/             # base, txt_writer, epub_writer, registry
-│   ├── storage/
-│   │   ├── database.py, models.py, repository.py
-│   │   └── migrations/         # alembic
+│   ├── storage/                # database.py, models.py, repository.py
 │   ├── scheduler/              # update_job.py (APScheduler)
 │   ├── application/
 │   │   ├── container.py        # 手写 DI
-│   │   └── services/           # download, search, convert, update, library, rules
-│   ├── config/                 # schema (pydantic-settings), paths (platformdirs), defaults.toml
-│   ├── cli/
-│   │   ├── main.py
-│   │   ├── commands/           # download, search, convert, update, library, rules, serve
-│   │   ├── renderers.py        # rich.progress → ProgressCallback
-│   │   └── disclaimer.py       # 首次运行免责声明
-│   ├── web/
-│   │   ├── app.py              # FastAPI + lifespan
-│   │   ├── routes/             # pages, downloads, library, rules, sse
-│   │   ├── templates/          # Jinja2 + partials/
-│   │   └── static/             # css, js/htmx.min.js, favicon
-│   ├── i18n/locale/            # zh_CN, en_US .po 文件
-│   ├── logging.py              # structlog 配置
-│   └── builtin_rules/          # example_static.yaml, example_browser.yaml
+│   │   ├── paths.py            # NDL_HOME 路径 helper
+│   │   └── services/           # download, search, convert, update, library, rule_update
+│   ├── cli/                    # main.py, disclaimer.py, renderers/
+│   ├── web/                    # app.py, jobs.py, templates/, static/
+│   └── builtin_rules/          # example_static.yaml
 ├── tests/
 │   ├── conftest.py
 │   ├── unit/                   # 镜像 src/ndl/ 结构
@@ -526,17 +512,19 @@ project_noveldownloader/
 
 ## 8. 依赖清单
 
-> **状态说明（2026-04-30）**：§8.1 是 **v1.0 目标**清单，包含搜索 / 远程规则 / 追更 / Web /
-> i18n 等多阶段工作所需的库。**P1 实际生效的依赖远少于此**，按 P 阶段逐步引入：
+> **状态说明（2026-05-13）**：§8.1 是 **v1.0 目标**清单，包含搜索 / 远程规则 / 追更 / Web /
+> i18n 等多阶段工作所需的库。实际依赖按 P 阶段逐步引入，未实现的横切能力不提前加依赖：
 >
 > - **P1 已落地（runtime）**：`typer`, `rich`, `pydantic`, `pyyaml`, `selectolax`, `httpx`, `ebooklib`
 > - **P1 已落地（dev）**：`mypy`, `pre-commit`, `pytest`, `pytest-asyncio`, `pytest-cov`, `respx`, `ruff`, `types-pyyaml`
 > - **P1 已落地（docs）**：`mkdocs`, `mkdocs-material`
-> - **P2 计划引入**：`SQLAlchemy>=2`（书库持久化）；`platformdirs`（跨平台路径）酌情同步
-> - **P3+ 计划引入**：`fastapi`, `uvicorn`, `jinja2`, `sse-starlette`（Web UI）
-> - **P4 计划引入**：`apscheduler`（追更调度）
-> - **P5 计划引入**：`structlog`, `babel`（结构化日志 + i18n）
-> - **P6 计划引入**：`playwright`（可选 extras）
+> - **P2 已落地**：`SQLAlchemy>=2`（书库持久化）
+> - **P3 已落地**：`fastapi`, `uvicorn`, `jinja2`, `sse-starlette`（Web UI）
+> - **P4 已落地**：`apscheduler`（追更调度）
+> - **P5 已落地**：搜索与远程规则更新未新增 `structlog` / `babel`
+> - **P6 已落地**：`playwright`（可选 `browser` extra）
+> - **P7.1 已落地**：`scripts/verify_distribution.py` 使用 stdlib，无新增依赖
+> - **仍未引入**：`structlog`, `babel`, `platformdirs`, `tenacity`, `aiolimiter`, `protego`, `pydantic-settings`, `lxml`, `aiosqlite`, `alembic`
 >
 > 以下清单按"加入时机"在 §9 路线图行内重申。新增任何依赖必须在对应 P 阶段 plan 中显式批准。
 
@@ -545,7 +533,7 @@ project_noveldownloader/
 ```toml
 [project]
 name = "ndl"
-version = "0.1.0"
+version = "0.1.0.dev0"
 requires-python = ">=3.10"
 description = "NOVELDOWNLOADER: 规则驱动的中文小说下载与格式转换工具"
 readme = "README.md"
@@ -621,7 +609,7 @@ build-backend = "hatchling.build"
 
 ### 8.2 前端静态资源
 
-`htmx.min.js`（约 14 KB）直接提交到 `src/ndl/web/static/js/`，不走 npm。固定版本写入 README 便于审计。
+当前实现不使用 Node/npm，也不提交第三方前端 bundle。Web UI 使用 Jinja2 模板、手写 CSS、少量原生 JavaScript 和 native `EventSource` 订阅 SSE。
 
 ---
 
@@ -632,13 +620,14 @@ build-backend = "hatchling.build"
 | **P0 脚手架** | 目录结构 + `pyproject.toml` + CI + LICENSE + 空 CLI | 1-2 天 | `ndl --version` 工作；CI 全绿 |
 | **P1 MVP：下载 + 转换** | `core` / `rules` / `fetchers(http)` / `parsers` / `converters` / `services(download+convert)` / `cli(download+convert)` + 合规 fixture 内置规则 + 契约测试 | 已完成 | `ndl download <url> -o book.epub` 端到端工作 |
 | **P2 书库持久化** | `storage` / `services(library)` / `cli(library)` | 1 周 | 下载自动入库；`ndl library {list,show,remove}` |
-| **P3 Web UI** | `web` / Jinja2 + HTMX + SSE / `ndl serve` | 1-2 周 | `localhost:8000` 可用 |
+| **P3 Web UI** | `web` / Jinja2 + SSE + native JS / `ndl serve` | 已完成 | `localhost:8000` 可用 |
 | **P4 追更** | `scheduler` / `services(update)` / CLI+Web 触发入口 | 1 周 | APScheduler 定时 + 手动双通道 |
 | **P5 搜索 + 远程规则** | `services(search)` / `rules/remote` / CLI 新命令 | 1 周 | `ndl search "关键词"` / `ndl rules update` |
-| **P6 浏览器 Fetcher + 发布** | `fetchers/browser` / 英文 locale / 文档站完善 / PyPI v0.1 | 1-2 周 | `pip install ndl[browser]` |
-| **P7 v1.0** | Docker 镜像 / 更多内置规则 / UX 打磨 / 批量导出 | 持续 | Docker Hub + v1.0 tag |
+| **P6 浏览器 Fetcher + 发布准备** | `fetchers/browser` / rule controls / diagnostics / release checklist | 已完成 | `pip install ndl[browser]` + `ndl doctor browser` |
+| **P7 Release Candidate Verification** | wheel/sdist verifier / release notes / install smoke strategy / release execution gate | P7.1 已完成，P7.2-P7.4 计划中 | 可重复构建并校验 release-candidate artifacts，不自动发布 |
+| **P8+ v1.0** | Docker 镜像 / 更多内置规则 / UX 打磨 / 批量导出 / i18n | 持续 | Docker Hub + v1.0 tag |
 
-**总计 MVP→PyPI 发布约 6-10 周**（兼职节奏，每日 1-2 小时）。
+**MVP 功能已基本落地；PyPI 发布仍等待 P7 release-candidate verification 完成与 maintainer 明确批准。**
 
 ### 9.1 MVP (v0.1) vs v1.0 能力对照
 
@@ -649,13 +638,13 @@ build-backend = "hatchling.build"
 | Web UI (基础) | ✓ | ✓ |
 | HTTP Fetcher | ✓ | ✓ |
 | 内置规则示例 | 2 条 | 5+ 条 |
-| Browser Fetcher | ✗ | ✓ (extras) |
-| 追更（手动+定时） | ✗ | ✓ |
-| 搜索（多源聚合） | ✗ | ✓ |
-| 远程规则更新 | ✗ | ✓ |
+| Browser Fetcher | ✓ (P6 optional extra + rule controls) | ✓ (extras) |
+| 追更（手动+定时） | ✓ | ✓ |
+| 搜索（多源聚合） | ✓ | ✓ |
+| 远程规则更新 | ✓ | ✓ |
 | i18n 中英双语 | 中 | 中+英 |
 | Docker 镜像 | ✗ | ✓ |
-| PyPI 发布 | ✓ | ✓ |
+| PyPI 发布 | 待 maintainer 明确批准 | ✓ |
 
 ---
 
@@ -671,7 +660,7 @@ build-backend = "hatchling.build"
 | 6 | **编码混乱**：GBK / GB18030 / UTF-8 混用 | 规则可声明 `encoding`；auto 用启发式检测 |
 | 7 | **存储膨胀**：长篇网文 ≈ 50 MB | 章节存 TEXT；`ndl library compact`；"导出后仅保留元数据"模式 |
 | 8 | **规则仓库供应链**：远程规则被注入 | 规则纯声明式无代码执行；`rules update` 显示 diff 需确认；v1.0 考虑签名 |
-| 9 | **Windows 路径/编码**：OS 最复杂 | CI 矩阵强制 `windows-latest`；`platformdirs` 统一路径；所有 I/O 显式 `encoding="utf-8"` |
+| 9 | **Windows 路径/编码**：OS 最复杂 | CI 矩阵强制 `windows-latest`；`NDL_HOME` helper 统一项目状态目录；所有 I/O 显式 `encoding="utf-8"` |
 
 ---
 

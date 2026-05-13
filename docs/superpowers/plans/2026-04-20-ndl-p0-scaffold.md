@@ -87,7 +87,7 @@ project_noveldownloader/
 │   └── developer/                    # 暂留空 README.md 占位
 ├── src/
 │   └── ndl/
-│       ├── __init__.py               # __version__ = "0.1.0"
+│       ├── __init__.py               # __version__ = "0.1.0.dev0"
 │       ├── __main__.py               # python -m ndl 入口
 │       └── cli/
 │           ├── __init__.py
@@ -456,7 +456,7 @@ version 2.1, available at
 
 ## Supported Versions
 
-Only the latest minor release on PyPI receives security fixes. Pre-release versions (0.x) may not be maintained once a newer 0.y is published.
+NDL has not been published to PyPI yet. Until the first public release, security fixes apply to the active repository state on `main`. After publication, only the latest minor release on PyPI receives security fixes; older pre-release versions (0.x) may not be maintained once a newer 0.y is published.
 
 ## Reporting a Vulnerability
 
@@ -508,11 +508,11 @@ cd project_noveldownloader
 uv sync --all-extras
 
 # Run tests
-uv run pytest
+uv run pytest --cov=ndl --cov-report=term --cov-report=xml
 
 # Run linter/formatter
 uv run ruff check .
-uv run ruff format .
+uv run ruff format --check .
 
 # Type check
 uv run mypy src/ndl
@@ -528,7 +528,7 @@ uv run pre-commit install
 NDL is rule-driven. Adding support for a new site does NOT require writing Python.
 
 1. Fork the repo
-2. Create a YAML rule under `src/ndl/builtin_rules/<your_site>.yaml` (for PR) or `~/.ndl/rules/custom/` (for personal use)
+2. Create a YAML rule under `src/ndl/builtin_rules/<your_site>.yaml` (for PR) or `<NDL_HOME>/rules/<your_site>.yaml` (for personal use)
 3. Add a contract test fixture under `tests/contract/fixtures/<rule_id>/` containing `index.html`, `chapter.html`, `expected.json`
 4. Run `uv run pytest tests/contract/ -k <rule_id>`
 5. Submit PR

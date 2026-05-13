@@ -1,14 +1,25 @@
 # NDL 项目会话状态快照
 
-> 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取当前活动 plan，再决定下一步动作。
+> 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取活动 P7 plan，然后参考已完成的 P6/P5 plan。
 >
-> 最后更新：2026-05-01（代码与文档审查完成：修正 P5 交接文档、补齐追更状态变化时的 `last_updated` 更新，并新增仓储回归测试。下一步进入 P5.1 Search domain + service）
+> 最后更新：2026-05-13（P7.1 release-candidate distribution verification 完成 + 预发布 P0 加固 4 项落地：LibraryRepository.save 改为追加式 upsert、SearchService 多源容错、JobRegistry 上限驱逐、UpdateService fetcher pool。详见 `docs/superpowers/plans/2026-05-13-ndl-p7-pre-release-hardening.md`。P7 active plan 仍为 `docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md`）
 
 ---
 
 ## 0. 项目一句话描述
 
 **NDL (NOVELDOWNLOADER)**：基于 Python 的规则驱动中文小说下载器 + 格式转换工具，MIT 开源，托管在 <https://github.com/makunxiang-cmd/project_noveldownloader>。
+
+## 0.1 下个 agent 快速接手摘要
+
+- **当前状态**：P0-P6 全部实现；P7.1 release-candidate distribution verification 已实现；预发布 P0/P1/P2 加固 9 项均已实现（详见 `docs/superpowers/plans/2026-05-13-ndl-p7-pre-release-hardening.md`）。P7 active plan 仍为 `docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md`。
+- **下一步**：P7.2 release notes draft，之后 P7.3 install smoke strategy 与 P7.4 release execution gate。不要发布、tag 或 bump 版本，除非 maintainer 明确要求。
+- **工作区状态**：有意保留未提交改动，范围包括 P5.1-P5.4、Python 3.14/SQLite ResourceWarning 治理、CI matrix 文档同步、P6.1-P6.4 浏览器/release hardening、P7.1 distribution verification、以及本次预发布 P0 加固。不要 reset/checkout 丢弃。
+- **最后完整验证（预发布 P0/P1/P2 加固后）**：`.venv/bin/ruff check .`、`.venv/bin/ruff format --check .`、`.venv/bin/mypy src/ndl`、`.venv/bin/pytest --cov=ndl --cov-report=term` 全绿；pytest 184 passed，coverage 88.96%。本次未重跑 `pre-commit run --all-files` / `uv lock --check`。
+- **加固后契约改动**：`SearchService.search()` 返回 `SearchOutcome(results, failures)` 而非 `list[SearchResult]`；调用方需通过 `outcome.results` / `outcome.failures` 访问。CLI 与 Web 均已适配。
+- **以前 P7.1 后验证**：`ruff check .`、`ruff format --check .`、`mypy src/ndl`、`pytest --cov=ndl --cov-report=term --cov-report=xml`、`pre-commit run --all-files`、`uv lock --check` 全绿；pytest 172 passed，coverage 88.91%。P7.1 验证过 `uv build --wheel --sdist --out-dir /private/tmp/ndl-p7-dist` 与 `scripts/verify_distribution.py`。
+- **本地 Web 验证**：`ndl serve` 在 `127.0.0.1:8765` 做过 HTTP smoke check，首页 200，空 keyword 搜索 400。P6.1 自动测试不下载/启动真实浏览器；Playwright runtime 仍需使用者安装 `ndl[browser]` 与 `playwright install chromium`。
+- **GitHub CLI**：当前 shell 无 `gh` 命令；如需 GitHub CLI，需先安装/配置。可用 GitHub connector 不等于本地 `gh` 已安装。
 
 ---
 
@@ -37,8 +48,17 @@
 | **P4.1 Manual Update** | `UpdateService` 按书库条目重新抓目录、比较已存章节 index、只抓缺失章节并追加入库；`ndl update --all` 复用免责声明 gate 和 CLI progress；无新增依赖 | 见 P4 plan §P4.1 |
 | **P4.2 Scheduled Runs** | `UpdateScheduler` 使用 APScheduler interval job 调用同一个 `UpdateService.update_all()`；`ndl serve` 默认启用定时追更并可通过 `--no-scheduler` / `--update-interval-hours` 调整；TestClient 默认不启动调度 | 见 P4 plan §P4.2 |
 | **P4.3 Web Update Trigger + Status** | Web 首页 `Update all` 入口；`/updates` 结果页展示 id/title/status/new/total/message；TestClient + mocked HTTP 覆盖 append-only 更新与空库状态 | 见 P4 plan §P4.3 |
+| **P5.1 Search Domain + Service** | `SearchResult` 领域模型（`core/models.py`）；`parse_search` HTML 解析器（`parsers/html_search.py`）；`SearchService.search(keyword, rule_ids=None)`（`application/services/search.py`）；`ServiceContainer.search_service()` 接线；`example_static` 规则增加 `search` 块；12 个新测试覆盖字段提取、URL 编码、规则过滤、空结果、容器缺失 | 见 P5 plan §P5.1 |
+| **P5.2 `ndl search` CLI** | `ndl search <keyword>`；Rich 表格输出 source/title/author/url；支持 repeatable `--rule` 与 `--limit`；空关键词、空 rule id、未知/不可搜索 rule id 走 `InvalidArgumentError`；CliRunner + mocked HTTP 覆盖结果、过滤、空态、错误 | 见 P5 plan §P5.2 |
+| **P5.3 Remote Rule Update** | `<NDL_HOME>/rules` 用户规则目录；默认规则加载支持用户规则覆盖 builtin；`RuleUpdateService` 拉取 manifest + YAML、校验可选 SHA-256、全量规则校验后生成写入计划；`ndl rules update --manifest-url` 展示摘要并确认后写盘；非法 bundle 不替换现有规则 | 见 P5 plan §P5.3 |
+| **P5.4 Web Search Surface** | Web 首页搜索表单；`GET /search` 复用 `SearchService.search()`；结果页展示 source/title/author/url；每条结果提供 Download 表单，复用现有 `/downloads` 后台下载 + SSE 状态流；TestClient + mocked HTTP 覆盖结果、rule filter、limit、空态和错误输入 | 见 P5 plan §P5.4 |
+| **P6.1 Browser Fetcher Foundation** | `pyproject.toml` 新增 `browser` optional extra（`playwright>=1.40`）；`src/ndl/fetchers/browser.py` 新增 `BrowserFetcher`，按 `fetcher.type: browser` 通过 `ServiceContainer` 路由；可选依赖缺失给出明确 `BrowserError`；浏览器路径保留 robots.txt、per-host throttle、retry 和 HTTP status 错误语义；单元测试使用 fake session/respx，不下载浏览器、不访问真实站点 | 见 P6 plan §P6.1 |
+| **P6.2 Browser Rule Controls** | `src/ndl/rules/schema.py` 新增 `BrowserRule` / `BrowserViewportRule`，规则可在 `fetcher.browser` 声明 navigation timeout、wait_until、wait_for_selector、extra_wait_ms、viewport、javascript_enabled；`BrowserFetcher` 将配置传入 Playwright context/page 调用；规则 schema 测试和 fake Playwright session 测试覆盖校验与消费路径 | 见 P6 plan §P6.2 |
+| **P6.3 Browser Diagnostics** | 新增 `BrowserRuntimeDiagnostic` 与 `check_browser_runtime()`；CLI 新增 `ndl doctor browser` 检查 Playwright 包与 Chromium runtime；BrowserError 启动失败详情包含 `ndl[browser]` / `uv sync --extra browser` 与 `playwright install chromium` 指引；Web 下载 job 失败通过现有 SSE status event 暴露同一诊断详情 | 见 P6 plan §P6.3 |
+| **P6.4 Release Hardening** | 新增 `docs/developer/release.md`，记录 v0.1 version decision、preflight gates、browser smoke check、artifact build/inspection、发布步骤和合规边界；用 `/private/tmp/ndl-dist` 临时构建 wheel/sdist 并验证 wheel 含 builtin rule、Web templates/static assets、`browser` extra metadata | 见 P6 plan §P6.4 |
+| **P7.1 Distribution Verification Script** | 新增 `scripts/verify_distribution.py`，用 stdlib 校验 wheel/sdist 必需资源（builtin rule、Web templates/static assets）与 wheel metadata（version、extras、browser Playwright dependency）；release checklist 改用该 verifier；单元测试覆盖完整 artifact 成功与缺失 member 失败 | 见 P7 plan §P7.1 |
 
-### 当前活动 Plan
+### 已完成 Plan
 
 已完成计划：**`docs/superpowers/plans/2026-04-29-ndl-p1-mvp.md`** —— P1 MVP 实施计划，6 个切片：
 
@@ -70,25 +90,204 @@
 - P4.2 ✅ implemented — Scheduled Runs Under `ndl serve`（APScheduler）
 - P4.3 ✅ implemented — Web Update Trigger + Status
 
-当前活动计划：**`docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md`** —— P5 Search and Remote Rules 计划：
+已完成计划：**`docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md`** —— P5 Search and Remote Rules 计划：
 
-- P5.1 ⏳ planned — Search Domain + Service
-- P5.2 ⏳ planned — `ndl search`
-- P5.3 ⏳ planned — Remote Rule Update
-- P5.4 ⏳ planned — Web Search Surface
+- P5.1 ✅ implemented — Search Domain + Service
+- P5.2 ✅ implemented — `ndl search`
+- P5.3 ✅ implemented — Remote Rule Update
+- P5.4 ✅ implemented — Web Search Surface
+
+已完成计划：**`docs/superpowers/plans/2026-05-13-ndl-p6-browser-release.md`** —— P6 Browser Fetcher and Release Hardening 计划：
+
+- P6.1 ✅ implemented — Optional Browser Fetcher Foundation
+- P6.2 ✅ implemented — Browser Rule Capabilities
+- P6.3 ✅ implemented — CLI/Web Documentation and Diagnostics
+- P6.4 ✅ implemented — Release Hardening
+
+活动计划：**`docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md`** —— P7 Release Candidate Verification 计划：
+
+- P7.1 ✅ implemented — Distribution Verification Script
+- P7.2 ⏳ planned — Release Notes Draft
+- P7.3 ⏳ planned — Install Smoke Strategy
+- P7.4 ⏳ planned — Release Execution Gate
+
+已完成（附属）：**`docs/superpowers/plans/2026-05-13-ndl-p7-pre-release-hardening.md`** —— 预发布 P0/P1/P2 加固，9 项均已实现：
+
+- P0.1 ✅ implemented — LibraryRepository 追加式 upsert（保留旧章节 + 首抓 fetched_at）
+- P0.2 ✅ implemented — SearchService 多源容错（SearchOutcome.results/failures）
+- P0.3 ✅ implemented — JobRegistry 上限与驱逐（默认 max_jobs=100，仅驱逐终态 job）
+- P0.4 ✅ implemented — UpdateService fetcher pool（update_all 期间按 rule.id 复用 fetcher）
+- P1.1 ✅ implemented — fetchers/_common.py（resolve_headers / backoff_delay；消除 BrowserFetcher 跨模块私有 import）
+- P1.2 ✅ implemented — BrowserFetcher 启动错误清理（_safe_aclose / _safe_stop_manager，避免 Playwright 子进程残留）
+- P2.1 ✅ implemented — SSE 用 asyncio.Event 替代 100ms 轮询（DownloadJob.notify；record/mark_* 全部 set）
+- P2.2 ✅ implemented — `ndl rules list` CLI（id/name/version/enabled/search/fetcher/patterns 表）
+- P2.3 ✅ implemented — RuleUpdateService 并发 fetch + https-only 白名单（NDL_RULES_ALLOW_INSECURE 可降级）
+
+剩余 non-goal：`/updates` 异步化、`Novel.cover_url` 校验器、RuleUpdateService 删除语义、`cli/renderers.py` 覆盖率、`_fetch_chapter` 重复代码。理由详见 plan 文档。
 
 ### 质量门当前状态
 
 ```
-ruff check / format     ✅
-mypy --strict (48 文件) ✅
-pytest                  ✅ 124 passed
-coverage                ✅ 89.41%（fail_under=80）
+ruff check / format     ✅ 98 files
+mypy --strict           ✅ 53 source files
+pytest                  ✅ 184 passed, 0 warnings
+coverage                ✅ 88.96%（fail_under=80）
 ```
+
+### 开发环境（macOS / 本地）
+
+- Python: 3.14.4（CI matrix 现覆盖 3.10–3.14）
+- 包管理: `uv 0.11.13`（aarch64-apple-darwin），`.venv` 是 macOS arm64
+- 全部 runtime/dev 依赖与 `uv.lock` 锁定一致
+- 标准开发命令均通过 `uv run`：
+
+```bash
+uv sync --extra dev
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src/ndl
+uv run pytest --cov=ndl --cov-report=term --cov-report=xml
+uv run pre-commit run --all-files
+```
+
+### 本轮（2026-05-13）执行要点
+
+**P6.1 Optional Browser Fetcher Foundation 实施**
+
+- 新增 `docs/superpowers/plans/2026-05-13-ndl-p6-browser-release.md`，把 P6 拆为 browser fetcher 基础、浏览器规则控制、诊断/文档、release hardening
+- `pyproject.toml` 新增 optional extra：`browser = ["playwright>=1.40"]`；`uv.lock` 已同步 optional dependency metadata（含 `playwright` / `pyee`）
+- `src/ndl/fetchers/browser.py` 新增 `BrowserFetcher`，实现现有 `Fetcher` protocol；默认通过 Playwright Chromium headless 渲染，返回 `page.content()`
+- 可选依赖缺失时抛 `BrowserError`，提示安装 `pip install ndl[browser]` 与 `playwright install chromium`
+- 浏览器路径保留项目既有边界：通过 `RobotsChecker` 先查 robots.txt，通过 `HostThrottle` 做 per-host 限速，通过 rule retry 处理 5xx / 浏览器错误；4xx 仍直接 `HTTPError`
+- `src/ndl/application/container.py`：默认 fetcher factory 根据 `rule.fetcher.type` 路由，`browser` → `BrowserFetcher`，否则保持 `HttpFetcher`
+- `src/ndl/fetchers/__init__.py` 导出 `BrowserFetcher`
+- `tests/unit/fetchers/test_browser.py`：fake browser session + respx 覆盖 rendered HTML、session 生命周期、5xx retry、robots block、HTTP 404、缺失 Playwright 诊断
+- `tests/unit/application/test_container.py`：覆盖默认 HTTP/browser fetcher 路由
+- 文档：README/README.zh-CN/docs/index/docs/user-guide/docs/developer/CHANGELOG/AGENTS/本文件同步 P6.1 状态
+- 质量门：`ruff check .`、`ruff format --check .`、`mypy src/ndl`、`pytest --cov=ndl --cov-report=term --cov-report=xml`（162 passed，coverage 88.74%）、`pre-commit run --all-files` 全部通过
+
+**P6.2 Browser Rule Controls 实施**
+
+- `src/ndl/rules/schema.py`：新增 `BrowserWaitUntil`、`BrowserViewportRule`、`BrowserRule`；`FetcherRule` 增加 `browser` 子配置，默认值兼容现有 HTTP 规则
+- `fetcher.browser` 支持 `navigation_timeout_ms`、`wait_until`（commit/domcontentloaded/load/networkidle）、`wait_for_selector`、`extra_wait_ms`、`viewport.width/height`、`javascript_enabled`
+- `src/ndl/fetchers/browser.py`：默认 timeout 改为读取 `rule.fetcher.browser.navigation_timeout_ms`；Playwright context 使用 viewport 和 JS 开关；page navigation 使用 wait_until，必要时等待 selector 和额外延迟
+- `src/ndl/rules/__init__.py` 导出 `BrowserRule` / `BrowserViewportRule`
+- `tests/unit/rules/test_schema.py` 覆盖浏览器配置合法值与非法 wait_until/timeout/viewport
+- `tests/unit/fetchers/test_browser.py` 增加 fake Playwright session 测试，验证 wait_until / wait_for_selector / wait_for_timeout 被消费
+- 文档：README/README.zh-CN/docs/index/docs/user-guide/docs/developer/docs/rule-authoring/CHANGELOG/AGENTS/P6 plan/本文件同步 P6.2 状态
+- 质量门：`ruff check .`、`ruff format --check .`、`mypy src/ndl`、`pytest --cov=ndl --cov-report=term --cov-report=xml`（166 passed，coverage 89.10%）、`pre-commit run --all-files`、`uv lock --check` 全部通过
+
+**P6.3 Browser Diagnostics 实施**
+
+- `src/ndl/fetchers/browser.py`：新增 `BrowserRuntimeDiagnostic` dataclass 与 `check_browser_runtime()`；检查 Playwright import 与 Chromium headless launch，不访问真实站点
+- `src/ndl/cli/main.py`：新增 `doctor` Typer 子命令组与 `ndl doctor browser`；成功输出 `Browser runtime: OK`，失败输出 `Browser runtime: FAILED` 并以 exit code 1 退出
+- Browser fetcher 缺失依赖/启动失败错误详情补充 `pip install ndl[browser]` / `uv sync --extra browser` 与 `playwright install chromium` 指引
+- Web 下载后台 job 继续复用 `NDLError.user_message()`；浏览器 runtime 失败会通过现有 SSE status event 暴露同一诊断消息
+- `tests/unit/fetchers/test_browser.py` 覆盖 missing Playwright diagnostic
+- `tests/unit/cli/test_main.py` 覆盖 `ndl doctor browser` 成功/失败输出与 exit code
+- `tests/unit/web/test_app.py` 覆盖浏览器 runtime 失败时 Web job 记录错误并通过 SSE status event 返回安装提示
+- 文档：README/README.zh-CN/docs/index/docs/user-guide/docs/developer/docs/rule-authoring/CHANGELOG/AGENTS/P6 plan/本文件同步 P6.3 状态
+- 质量门：`ruff check .`、`ruff format --check .`、`mypy src/ndl`、`pytest --cov=ndl --cov-report=term --cov-report=xml`（170 passed，coverage 88.91%）、`pre-commit run --all-files`、`uv lock --check` 全部通过
+
+**P6.4 Release Hardening 实施**
+
+- 新增 `docs/developer/release.md`：记录当前版本仍为 `0.1.0.dev0`，v0.1 发布前由 maintainer 专门 bump 到 `0.1.0`
+- release checklist 覆盖 `uv lock --check`、ruff、format、mypy、pytest coverage、pre-commit、optional browser smoke (`ndl doctor browser`)
+- release checklist 覆盖 `uv build --wheel --sdist --out-dir dist`、wheel/sdist inspection、PyPI 发布步骤和合规边界
+- `docs/index.md` 与 `docs/developer/README.md` 链接 release checklist
+- 本地临时构建验证：`uv build --wheel --sdist --out-dir /private/tmp/ndl-dist` 成功生成 `ndl-0.1.0.dev0.tar.gz` 和 `ndl-0.1.0.dev0-py3-none-any.whl`
+- wheel 内容验证包含 `ndl/builtin_rules/example_static.yaml`、`ndl/web/templates/*.html`、`ndl/web/static/css/app.css`、`ndl/web/static/js/app.js`
+- wheel metadata 验证：`Version: 0.1.0.dev0`、`Provides-Extra: browser/dev/docs`、`Requires-Dist: playwright>=1.40; extra == 'browser'`
+- 文档：CHANGELOG/AGENTS/P6 plan/本文件同步 P6.4 状态
+
+**P7.1 Distribution Verification Script 实施**
+
+- 新增 `docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md`，把 P7 拆为 distribution verifier、release notes draft、install smoke strategy、release execution gate
+- 新增 `scripts/verify_distribution.py`，只用 Python stdlib (`zipfile` / `tarfile` / `email.parser`) 校验 wheel/sdist
+- verifier 检查 wheel 必含 `ndl/builtin_rules/example_static.yaml`、`ndl/web/templates/*.html`、`ndl/web/static/css/app.css`、`ndl/web/static/js/app.js`
+- verifier 检查 wheel metadata：当前版本 `0.1.0.dev0`、`Provides-Extra: browser/dev/docs`、`Requires-Dist: playwright>=1.40; extra == 'browser'`
+- verifier 检查 sdist 必含 `pyproject.toml`、builtin rule、Web templates/static assets
+- `docs/developer/release.md` 的 artifact inspection 增加 `uv run python scripts/verify_distribution.py dist/ndl-*.whl dist/ndl-*.tar.gz`
+- `tests/unit/scripts/test_verify_distribution.py` 覆盖完整 fake artifact 成功与缺失 `ndl/web/static/js/app.js` 失败
+- 本地临时构建验证：`uv build --wheel --sdist --out-dir /private/tmp/ndl-p7-dist` 成功，`scripts/verify_distribution.py` 对生成的 wheel/sdist 返回 `Distribution artifacts verified.`
+- 质量门：`ruff check .`、`ruff format --check .`、`mypy src/ndl`、`pytest --cov=ndl --cov-report=term --cov-report=xml`（172 passed，coverage 88.91%）、`pre-commit run --all-files`、`uv lock --check` 全部通过
+
+**文档交接整理**
+
+- README、中文 README、docs index、user/developer/rule-authoring guide、release checklist、ADR、design spec、P3/P5/P6 plans、CONTEXT、SECURITY、CONTRIBUTING、CHANGELOG 与本文件同步到 P0-P6 完成、P7.1 已完成、P7.2 下一步
+- 清理旧 handoff 文案：不再让新 agent 以 P5 或 P6 为活动 milestone；明确活动计划为 P7 release-candidate verification
+- 明确发布边界：当前仍未发布到 PyPI，版本仍为 `0.1.0.dev0`，不 bump/tag/release/upload，除非 maintainer 明确批准
+- 设计文档补齐实现偏差：当前 Web UI 是 Jinja2 + SSE + native JavaScript，不使用 HTMX；用户规则加载是 builtin + `<NDL_HOME>/rules/*.yaml`，不递归加载 `custom/`
+- 验证：`.venv/bin/ruff format --check .`、`.venv/bin/ruff check .`、`.venv/bin/mypy src/ndl`、`.venv/bin/pytest --cov=ndl --cov-report=term --cov-report=xml`、`git diff --check` 通过；`uv run pre-commit run --all-files` / `uv lock --check` 未能重跑，原因是沙箱不能访问 `/Users/makunxiang/.cache/uv` 且提权请求被系统拒绝
+
+### 本轮（2026-05-11）执行要点
+
+**P5.4 Web Search Surface 实施**
+
+- `src/ndl/web/app.py`：新增 `GET /search`；解析 keyword/rule_id/limit；复用 `service_container.search_service().search()`；错误输入走现有 `error.html` / `UserError` 风格
+- `src/ndl/web/templates/index.html`：首页新增搜索表单，包含 keyword、source(rule_id)、limit
+- `src/ndl/web/templates/search_results.html`：新增搜索结果页；展示 source/title/author/url；每条结果提供 POST `/downloads` 的 Download 表单，复用现有 Web 下载后台任务与 SSE 结果流
+- `src/ndl/web/static/css/app.css`：新增 search panel/results/inline download 样式，沿用现有紧凑本地工具界面
+- `tests/unit/web/test_app.py`：新增 5 个 Web 搜索测试（mocked search results、rule filter + limit、empty state、missing keyword、unsupported rule）；不接真实网络
+- 文档：README/README.zh-CN/docs/index/docs/user-guide/docs/developer/CHANGELOG/AGENTS/P5 plan/本文件同步到 P5.4 完成、P5 全部完成
+- 质量门：`ruff check .`、`ruff format --check .`、`mypy src/ndl`、`pytest --cov=ndl --cov-report=term --cov-report=xml`、`pre-commit run --all-files` 全部通过
+
+**P5.3 Remote Rule Update 实施**
+
+- `src/ndl/application/paths.py`：新增 `rules_dir()`，用户规则目录固定为 `<NDL_HOME>/rules`
+- `src/ndl/rules/loader.py`：新增 `load_rule_text()` 与 `load_default_rules(user_rules_path=...)`；默认规则加载顺序为 builtin 优先、用户规则按 id 覆盖 builtin；`ServiceContainer` 默认改用 `load_default_rules(user_rules_path=rules_dir())`
+- `src/ndl/application/services/rule_update.py`：新增 `RemoteRuleManifest` / `RemoteRuleEntry` schema、`RuleUpdatePlan` / `RuleUpdateItem`、`RuleUpdateService.plan_update()` / `apply_update()`；manifest 支持 `version: 1` + `rules[{id,url,sha256?}]`
+- 远程更新行为：先下载 manifest，再下载全部 YAML；可选 SHA-256 校验；每条规则用 Pydantic schema 校验；manifest id 必须等于 YAML rule id；全部通过后才生成写入计划
+- `src/ndl/cli/main.py`：新增 `ndl rules update --manifest-url <url> [--yes]`；也支持 `NDL_RULES_MANIFEST_URL`；输出 status/id/name/version/target 摘要表；默认要求确认后写入
+- 安全边界：非法 remote bundle、checksum mismatch、id mismatch 都不会替换 `<NDL_HOME>/rules` 里已有文件；无默认远程 feed，必须显式传 URL 或环境变量
+- 测试：`tests/unit/application/services/test_rule_update.py` 覆盖写入、unchanged、非法 bundle 不替换、checksum mismatch；CLI 覆盖确认写入、拒绝确认、非法 bundle、缺失 manifest；loader 覆盖用户规则覆盖 builtin
+- 文档：README/README.zh-CN/docs/index/docs/user-guide/docs/developer/CHANGELOG/AGENTS/P5 plan/本文件同步到 P5.3 完成、P5.4 next
+- 质量门：`ruff check .`、`ruff format --check .`、`mypy src/ndl`、`pytest --cov=ndl --cov-report=term --cov-report=xml`、`pre-commit run --all-files` 全部通过
+
+**P5.2 `ndl search` CLI 实施**
+
+- `src/ndl/cli/main.py`：新增 `@app.command("search")`；必填 keyword；可选 repeatable `--rule` 传给 `SearchService.search(..., rule_ids=...)`；可选 `--limit` 截断输出行
+- CLI 输出：搜索结果用 Rich 表格渲染 `source / title / author / url`；空结果输出 `No search results.`
+- CLI 校验：空 keyword、空 rule id、未知/不可搜索 rule id 均抛 `InvalidArgumentError`；错误详情列出可用 searchable rule id
+- `src/ndl/application/container.py`：新增只读 `list_rules()`，供 CLI 在搜索前验证 `--rule` 选择；不触发 SQLite engine 创建
+- 测试：`tests/unit/cli/test_main.py` 新增 5 个 CliRunner 用例（mocked search results、`--rule` + `--limit`、空结果、空 keyword、未知 rule id）；`tests/unit/application/test_container.py` 新增 `list_rules()` 顺序测试
+- 文档：README/README.zh-CN/docs/index/docs/user-guide/docs/developer/CHANGELOG/AGENTS/P5 plan/本文件同步到 P5.2 完成、P5.3 next
+- 质量门：`ruff check .`、`ruff format --check .`、`mypy src/ndl`、`pytest --cov=ndl --cov-report=term --cov-report=xml`、`pre-commit run --all-files` 全部通过
+
+**P5.1 Search Domain + Service 实施**
+
+- `src/ndl/core/models.py`：新增 `SearchResult` 冻结领域模型（title/author/url/source_rule_id/source_name），field_validator 保证非空 strip
+- `src/ndl/parsers/html_search.py`：`parse_search(rule, html, *, base_url)` 复用 `extract_text` + selector DSL，author 字段缺失时 fallback 为 None；container 缺失抛 `SelectorNotFoundError`
+- `src/ndl/application/services/search.py`：`SearchService.search(keyword, rule_ids=None)`；并发 `asyncio.create_task` + `as_completed`，关键词 `urllib.parse.quote_plus`；只对 `rule.enabled and rule.search is not None` 的规则执行；每个 fetcher 独立 `aclose()`
+- `src/ndl/application/container.py`：`ServiceContainer.search_service()` 工厂方法
+- `src/ndl/builtin_rules/example_static.yaml`：增加声明式 `search` 块（`url_template={keyword}` placeholder + results_container/items + fields.title/author/url）
+- 测试：`tests/unit/parsers/test_html_search.py`（6 例）+ `tests/unit/application/services/test_search.py`（6 例），全部用 mocked HTTP 或 inline HTML
+
+**开发环境恢复**
+
+- 检测到 `.venv/bin/ruff` 是 ELF Linux x86-64，macOS 上无法执行
+- 安装 `uv 0.11.13`（aarch64-apple-darwin），`uv sync --extra dev` 重建 `.venv` 为原生 macOS arm64
+- `pyproject.toml` classifiers 补上 Python 3.13 / 3.14
+- `.github/workflows/ci.yml` test matrix 从 `["3.10", "3.11", "3.12"]` 扩到 `["3.10", "3.11", "3.12", "3.13", "3.14"]`
+
+**代码 / 仓库治理**
+
+- 7 个 `__init__.py` / `__main__.py` 补齐 `from __future__ import annotations`（项目约定要求每个模块都有）
+- 137 个文件的 `100644 → 100755` mode 噪音批量 `chmod 644` 清零
+- 当时同步了 README.md / README.zh-CN.md / docs/index.md / docs/developer/README.md / AGENTS.md 的 P5 状态行；最新交接状态以后续 P6/P7 小节和本文件顶部摘要为准
+
+**架构改进 + SQLite ResourceWarning 修复**
+
+- Python 3.14 收紧了 sqlite3 connection 生命周期检查，出现 11 条 `ResourceWarning: unclosed database`
+- `ServiceContainer` 增加 `close()` 方法 + `__enter__`/`__exit__` 上下文管理器协议；`close()` 是幂等的，仅在 `_engine` 被懒加载后才 dispose
+- `cli/main.py` 全部 6 处 `ServiceContainer()` 调用改用 `with` 块（library list/show/remove + download/convert/update）
+- `web/app.py` lifespan 退出时 `service_container.close()`
+- 测试侧：`tests/unit/storage/test_database.py` 重写用 `engine` / `factory` fixture；`tests/unit/web/test_app.py` 加 `make_container` fixture（factory 模式 + teardown 自动 close）；`tests/unit/cli/test_main.py` / `tests/unit/application/test_container.py` / `tests/unit/application/services/test_update.py` 改用 `with ServiceContainer()`
+- 结果：11 → 0 warnings；136 个测试全过；coverage 提升到 89.81%
 
 ### 本轮（2026-05-01）审查修补要点
 
-- `AGENTS.md`、`docs/developer/README.md`、设计文档实现状态、关键文件清单已同步到 P0-P4 完成、P5 当前活动计划
+- `AGENTS.md`、`docs/developer/README.md`、设计文档实现状态、关键文件清单当时已同步到 P0-P4 完成、P5 计划待实施
 - `LibraryRepository.append_chapters()` 现在会在小说状态变化但无新增章节时同步更新 `last_updated`
 - `tests/unit/storage/test_repository.py` 增加回归测试，覆盖“状态更新但追加 0 章”的追更边界
 - 清理 `storage.repository._coerce_status()` 的不必要 `type: ignore`
@@ -237,23 +436,37 @@ uv run pre-commit run --all-files
 
 ```
 1. Read docs/superpowers/SESSION-STATE.md（本文件）
-2. Read docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md（活动 plan）
-3. Read AGENTS.md + docs/agents/issue-tracker.md（约定）
-4. 检查仓库状态：git log --oneline -10 + git status，确认是否存在未提交切片变更
-5. 确认本文件 §1 的"已完成"列表与代码实际情况一致：
+2. Read docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md（活动的 P7 plan）
+3. Read docs/superpowers/plans/2026-05-13-ndl-p6-browser-release.md（已完成的 P6 plan）
+4. Read docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md（已完成的 P5 plan，历史参考）
+5. Read AGENTS.md + docs/agents/issue-tracker.md（约定）
+6. 检查仓库状态：git log --oneline -10 + git status --short；当前预期存在未提交 P5.1-P5.4 + 治理/文档变更 + P6.1-P6.4 browser/release work + P7.1 verifier
+7. 确认本文件 §1 的"已完成"列表与代码实际情况一致：
    - src/ndl/core/        ✅ P1.1
    - src/ndl/rules/       ✅ P1.1
    - src/ndl/parsers/     ✅ P1.2 + P1.4 TXT reader
-   - src/ndl/fetchers/    ✅ P1.3
+   - src/ndl/fetchers/    ✅ P1.3 + P6.1 BrowserFetcher
    - src/ndl/converters/  ✅ P1.4
    - src/ndl/application/ ✅ P1.5 + P2.3 library + P4.1 update service
    - src/ndl/scheduler/   ✅ P4.2 APScheduler wrapper
    - src/ndl/cli/         ✅ P1.6 + P2.4 library commands + P3.4 serve + P4.1 update + P4.2 scheduler flags
    - src/ndl/storage/     ✅ P2.1-P2.2 + P4.1 append_chapters
    - src/ndl/web/         ✅ P3.1-P3.5 + P4.3 update controls
-6. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
-7. P4 全部已完成；下一步进入 P5.1 Search domain + service
-8. 完成新切片后：更新 CHANGELOG.md、活动 plan 的 Status 行、本文件
+   - src/ndl/parsers/html_search.py     ✅ P5.1
+   - src/ndl/application/services/search.py  ✅ P5.1
+   - src/ndl/cli/main.py search command      ✅ P5.2
+   - src/ndl/application/services/rule_update.py ✅ P5.3
+   - <NDL_HOME>/rules default loading path         ✅ P5.3
+   - src/ndl/web/templates/search_results.html     ✅ P5.4
+   - src/ndl/web/app.py /search route              ✅ P5.4
+   - src/ndl/fetchers/browser.py                   ✅ P6.1
+   - src/ndl/rules/schema.py BrowserRule           ✅ P6.2
+   - src/ndl/cli/main.py doctor browser            ✅ P6.3
+   - docs/developer/release.md                     ✅ P6.4
+   - scripts/verify_distribution.py                ✅ P7.1
+8. 跑一遍质量门（见上节）确认绿；如果某项失败，先修复再推进
+9. P7.1 已完成；继续 P7.2 前先更新/确认 P7 plan 范围
+10. 若要扩大 milestone 范围，先写/更新 plan，再实现；完成后更新 CHANGELOG.md、对应 plan、本文件
 ```
 
 ### 工程风格约定（已在前 6 阶段固化，必须延续）
@@ -261,23 +474,52 @@ uv run pre-commit run --all-files
 - **子模块平铺**：每个职责一个 `.py`，私有 helper 用 `_xxx.py`，`__init__.py` 仅做 import re-export + `__all__`
 - **薄包装类**：纯函数承担逻辑（如 `parse_index(rule, html, ...)`），Protocol 实现作为绑定 rule 的薄类（如 `HtmlParser` / `HttpFetcher`）
 - **类型严格**：mypy `--strict` 必须过；`python_version = "3.10"` —— 不要用 `Self` 等 3.11+ 语法
-- **`from __future__ import annotations`** 每个模块顶部都加
+- **`from __future__ import annotations`** 每个模块顶部都加（包括 `__init__.py` / `__main__.py`，2026-05-11 已统一补齐）
 - **零冗余注释**：模块单行 docstring + 公开函数单行 docstring；不要 WHAT 注释
 - **错误层级对齐 `core/errors.py`**：`UserError` / `RuleError` / `FetchError` / `ParseError` / `StorageError` / `ConvertError`，新错误类必须落在某个分支下
 - **测试结构镜像源码**：`tests/unit/<package>/test_<module>.py`；契约测试在 `tests/contract/`
-- **不要新增依赖除非 plan 已写明**：P1.3 加入 `httpx` + `respx`，P1.4 加入 `ebooklib`，均是 plan/设计显式要求
+- **不要新增依赖除非 plan 已写明**：已落地依赖按 P1-P6 plan 阶段化引入；P7.1 verifier 刻意只用 stdlib。新增 runtime/dev/browser 依赖前先更新 plan。
+- **`ServiceContainer` 是上下文管理器**（2026-05-11 引入）：CLI 命令和测试中创建 `ServiceContainer()` 必须用 `with` 块或显式 `container.close()`，确保 SQLAlchemy engine 在使用后被 dispose；这是 Python 3.14 上避免 `ResourceWarning: unclosed database` 的必要步骤
 
 ---
 
-## 3. 下一步（P5.1 Search Domain + Service）的预备信息
+## 3. 下一步预备信息
 
-P4 已经完成追更核心、CLI、定时调度和 Web 手动入口。接手 agent 应按 `docs/superpowers/plans/2026-05-01-ndl-p5-search-rules.md` 实施 P5.1。
+P7 是当前活动 milestone。`docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md` 已创建，P7.1 distribution verification 已实现；下一步是 P7.2 release notes draft。
 
-- P5.1 应先定义搜索结果领域模型和服务层，不急着做 CLI/Web
-- 搜索能力必须由规则声明驱动；如需扩展 rule schema，保持向后兼容并补 fixtures
-- 测试继续使用 bundled fixture 或 mocked HTTP，不接真实网络
-- 不要把商业平台、登录、验证码、Cloudflare 或 paywall 绕过放入搜索范围
-- 合规边界继续沿用：免责声明、robots.txt、限速/并发约束不可绕过
+**P7 当前边界**
+
+1. 不 bump 版本、不创建 tag、不发 GitHub Release、不上传 PyPI，除非 maintainer 明确要求。
+2. Release-candidate 工作只做可重复验证、文档和人工发布前的 gate。
+3. 自动测试仍不得访问真实小说站点；browser 相关测试继续使用 fake session / mocked HTTP。
+
+**P7.1 已实现命令**
+
+```bash
+uv build --wheel --sdist --out-dir /private/tmp/ndl-p7-dist
+uv run python scripts/verify_distribution.py /private/tmp/ndl-p7-dist/ndl-*.whl /private/tmp/ndl-p7-dist/ndl-*.tar.gz
+```
+
+verifier 检查 wheel/sdist 中的 builtin rule、Web templates/static assets，以及 wheel metadata 中的 version、extras、browser Playwright dependency。
+
+**P7.2 建议输出**
+
+- 把 `CHANGELOG.md` 巨大的 Unreleased 条目整理成 maintainer 可审阅的 v0.1 release notes draft。
+- 用户价值优先：下载/转换、书库、更新、搜索、远程规则、Web UI、可选 browser、release verification。
+- 保留合规边界：no commercial platforms、no login/CAPTCHA/paywall/Cloudflare bypass、no proxy pools。
+- 不要删除详细 changelog；可以新增 release-note 小节或独立文档，保持完整审计轨迹。
+
+**历史实现速查（P2-P6）**
+
+- `ServiceContainer.list_rules() -> list[SourceRule]`：CLI 搜索前验证 searchable rule id
+- `ServiceContainer.search_service() -> SearchService`
+- `SearchService.search(keyword: str, *, rule_ids: list[str] | None = None) -> list[SearchResult]`
+- `ndl search <keyword> [--rule RULE_ID ...] [--limit N]`
+- 搜索结果表格字段：`source / title / author / url`
+- `RuleUpdateService.plan_update()` / `apply_update()` 与 `ndl rules update --manifest-url <url> [--yes]`
+- 默认规则加载会包含 `<NDL_HOME>/rules/*.yaml` 并按 rule id 覆盖 builtin
+- Web `GET /search` 复用 `SearchService`，结果页每条结果可 POST 到 `/downloads`
+- 合规边界继续沿用：免责声明、robots.txt、限速/并发约束不可绕过；不支持商业平台 / 登录 / 验证码 / Cloudflare / paywall 绕过
 
 P3.1 已落地清单：
 
@@ -356,9 +598,9 @@ P2 退出条件已满足：
 - ✅ 存储：SQLite + SQLAlchemy 2.0 Mapped style + WAL（P2.1 已落地，仓储/服务/CLI 在 P2.2–P2.4）
 - ✅ Web：FastAPI + Jinja2 + SSE 已落地到 P3.5；HTMX 尚未使用
 - ✅ 调度：APScheduler AsyncIO（P4.2 已落地于 `src/ndl/scheduler/`）
-- ⏳ Playwright extras（P2+，按需）
-- ⏳ 日志：`structlog`（P5 阶段）
-- ⏳ i18n：`babel`（P5+）
+- ✅ Playwright optional extra（P6.1 已落地为 `browser` extra；真实 Chromium runtime 由使用者执行 `playwright install chromium` 安装）
+- ⏳ 日志：`structlog`（后续 observability/release-hardening 可再评估）
+- ⏳ i18n：`babel`（后续 i18n 需求明确后再评估）
 
 **伦理硬约束（不可协商）：**
 
@@ -401,23 +643,26 @@ P2 退出条件已满足：
 │       │   ├── 2026-04-30-ndl-p2-library.md          ← P2 计划（已完成）
 │       │   ├── 2026-05-01-ndl-p3-web-ui.md           ← P3 计划（已完成）
 │       │   ├── 2026-05-01-ndl-p4-update-scheduling.md ← P4 计划（已完成）
-│       │   └── 2026-05-01-ndl-p5-search-rules.md     ← 当前活动 plan
+│       │   ├── 2026-05-01-ndl-p5-search-rules.md     ← P5 计划（已完成）
+│       │   ├── 2026-05-13-ndl-p6-browser-release.md  ← P6 计划（已完成）
+│       │   └── 2026-05-13-ndl-p7-release-candidate.md ← P7 计划（活动）
 │       └── specs/
 │           └── 2026-04-20-ndl-design.md              ← 设计基础（v0.1 全套）
 ├── pyproject.toml                                    ← 依赖与质量工具配置
+├── scripts/verify_distribution.py                    ← P7.1 wheel/sdist verifier
 ├── src/ndl/
-│   ├── core/        ✅ P1.1
-│   ├── rules/       ✅ P1.1
-│   ├── parsers/     ✅ P1.2 + P1.4 TXT reader
-│   ├── fetchers/    ✅ P1.3
+│   ├── core/        ✅ P1.1 + P5.1 SearchResult model
+│   ├── rules/       ✅ P1.1 + P5.3 user rule loading + P6.2 BrowserRule
+│   ├── parsers/     ✅ P1.2 + P1.4 TXT reader + P5.1 html_search.py
+│   ├── fetchers/    ✅ P1.3 + P6.1 BrowserFetcher + P6.3 browser diagnostics
 │   ├── converters/  ✅ P1.4
-│   ├── application/ ✅ P1.5 + P2.3 library service + P4.1 update service
+│   ├── application/ ✅ P1.5 + P2.3 library service + P4.1 update service + P5.1 SearchService + P5.2 list_rules() + P5.3 RuleUpdateService + 2026-05-11 ServiceContainer.close() / context manager
 │   ├── scheduler/   ✅ P4.2 recurring update jobs
-│   ├── cli/         ✅ P1.6 + P2.4 library commands + P3.4 serve + P4 update/serve scheduler flags
+│   ├── cli/         ✅ P1.6 + P2.4 library commands + P3.4 serve + P4 update/serve scheduler flags + P5.2 ndl search + P5.3 rules update + P6.3 doctor browser + 2026-05-11 with-block engine cleanup
 │   ├── storage/     ✅ P2.1-P2.2 + P4.1 append-only updates
-│   ├── web/         ✅ P3.1-P3.5 + P4.3 update controls/results
-│   └── builtin_rules/example_static.yaml             ← 测试用规则
+│   ├── web/         ✅ P3.1-P3.5 + P4.3 update controls/results + P5.4 search UI + 2026-05-11 lifespan engine dispose
+│   └── builtin_rules/example_static.yaml             ← 测试用规则（2026-05-11 增加 search 块）
 └── tests/
     ├── contract/                                     ← 端到端契约测试 + fixtures
-    └── unit/                                         ← 镜像 src/ndl 结构
+    └── unit/                                         ← 镜像 src/ndl 结构，含 tests/unit/scripts/test_verify_distribution.py
 ```
