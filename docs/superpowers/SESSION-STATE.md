@@ -12,8 +12,8 @@
 
 ## 0.1 下个 agent 快速接手摘要
 
-- **当前状态**：P0-P6 全部实现；P7.1 release-candidate distribution verification 已实现；预发布 P0/P1/P2 加固 9 项均已实现（详见 `docs/superpowers/plans/2026-05-13-ndl-p7-pre-release-hardening.md`）。P7 active plan 仍为 `docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md`。
-- **下一步**：P7.2 release notes draft，之后 P7.3 install smoke strategy 与 P7.4 release execution gate。不要发布、tag 或 bump 版本，除非 maintainer 明确要求。
+- **当前状态**：P0-P6 全部实现；P7.1 distribution verification + P7.2 release notes draft 已实现；预发布 P0/P1/P2 加固 9 项均已实现。release notes 草稿在 `docs/release-notes/v0.1.md`，已挂入 MkDocs nav。
+- **下一步**：P7.3 install smoke strategy（CI-friendly 的离线安装冒烟方案），之后 P7.4 release execution gate。不要发布、tag 或 bump 版本，除非 maintainer 明确要求。
 - **工作区状态**：有意保留未提交改动，范围包括 P5.1-P5.4、Python 3.14/SQLite ResourceWarning 治理、CI matrix 文档同步、P6.1-P6.4 浏览器/release hardening、P7.1 distribution verification、以及本次预发布 P0 加固。不要 reset/checkout 丢弃。
 - **最后完整验证（预发布 P0/P1/P2 加固后）**：`.venv/bin/ruff check .`、`.venv/bin/ruff format --check .`、`.venv/bin/mypy src/ndl`、`.venv/bin/pytest --cov=ndl --cov-report=term` 全绿；pytest 184 passed，coverage 88.96%。本次未重跑 `pre-commit run --all-files` / `uv lock --check`。
 - **加固后契约改动**：`SearchService.search()` 返回 `SearchOutcome(results, failures)` 而非 `list[SearchResult]`；调用方需通过 `outcome.results` / `outcome.failures` 访问。CLI 与 Web 均已适配。
@@ -107,7 +107,7 @@
 活动计划：**`docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md`** —— P7 Release Candidate Verification 计划：
 
 - P7.1 ✅ implemented — Distribution Verification Script
-- P7.2 ⏳ planned — Release Notes Draft
+- P7.2 ✅ implemented — Release Notes Draft（`docs/release-notes/v0.1.md`，已挂入 MkDocs nav）
 - P7.3 ⏳ planned — Install Smoke Strategy
 - P7.4 ⏳ planned — Release Execution Gate
 

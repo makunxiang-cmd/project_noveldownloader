@@ -59,4 +59,6 @@ nav:
   - User Guide: user-guide/README.md
   - Rule Authoring: rule-authoring/README.md
   - Developer: developer/README.md
+  - Release Notes:
+      - v0.1 (Draft): release-notes/v0.1.md
   - Design Spec: superpowers/specs/2026-04-20-ndl-design.md

@@ -41,7 +41,7 @@ Exit criteria:
 
 ### P7.2 Release Notes Draft
 
-Status: planned.
+Status: implemented.
 
 Scope:
 
@@ -49,9 +49,19 @@ Scope:
 - Keep detailed implementation bullets available but put user-facing highlights first
 - Keep compliance boundaries explicit
 
+Output:
+
+- `docs/release-notes/v0.1.md` — draft, marked "pending maintainer approval".
+  Leads with highlights and compliance boundaries, then quick-start commands,
+  pre-release hardening summary, what's-not-included, quality snapshot, and
+  the maintainer-only execution gate.
+- Linked into the MkDocs nav under `Release Notes → v0.1 (Draft)`.
+
 Exit criteria:
 
-- Maintainer can review release notes without reading the entire handoff state
+- ✅ Maintainer can review release notes without reading the entire handoff
+  state (one page, ~10 sections).
+- ✅ Compliance boundaries appear before any feature bullet.
 
 ### P7.3 Install Smoke Strategy
 
