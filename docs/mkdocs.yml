@@ -58,7 +58,11 @@ nav:
   - Home: index.md
   - User Guide: user-guide/README.md
   - Rule Authoring: rule-authoring/README.md
-  - Developer: developer/README.md
+  - Developer:
+      - Overview: developer/README.md
+      - Release Runbook: developer/release.md
   - Release Notes:
       - v0.1 (Draft): release-notes/v0.1.md
-  - Design Spec: superpowers/specs/2026-04-20-ndl-design.md
+  - Architecture:
+      - ADR-0001 — Architecture & Dependencies: adr/0001-architecture-and-deps.md
+      - Design Spec: superpowers/specs/2026-04-20-ndl-design.md
