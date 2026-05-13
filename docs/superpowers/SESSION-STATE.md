@@ -13,6 +13,7 @@
 ## 0.1 下个 agent 快速接手摘要
 
 - **当前状态**：P0-P7 全部实现。预发布 P0/P1/P2 加固 9 项均已实现。release notes 草稿在 `docs/release-notes/v0.1.md`，install smoke 脚本在 `scripts/smoke_cli.py`，release.md 已含 Execution Gate 表 + 11 步 Maintainer Runbook。v0.1 释放候选 verification 链路全绿。
+- **PyPI 命名**：`ndl` 名字 2016 年被无关项目 `msull/needle` 注册，故 v0.1 发行名改为 **`noveldownloader`**。Python import (`from ndl...`) 与 CLI 入口 (`ndl`) 保持不变。`pyproject.toml.name`、`uv.lock`、README、release notes、release.md wheel filename、`fetchers/browser.py` 报错文案、verifier 测试夹具均已同步。已用 `uv build` 生成 `noveldownloader-0.1.0.dev0` 工件并跑过 verifier + clean-venv smoke。
 - **下一步**：等待 maintainer 显式授权后由 maintainer 执行 release runbook（pyproject 版本 bump、CHANGELOG dated heading、release commit、tag、push、GitHub Release、PyPI 上传）。**Agent 不得执行 release runbook 任何步骤**——即便用户在后续会话中要求，也要先指向 `docs/developer/release.md` 的 Execution Gate 段并停手。
 - **工作区状态**：有意保留未提交改动，范围包括 P5.1-P5.4、Python 3.14/SQLite ResourceWarning 治理、CI matrix 文档同步、P6.1-P6.4 浏览器/release hardening、P7.1 distribution verification、以及本次预发布 P0 加固。不要 reset/checkout 丢弃。
 - **最后完整验证（预发布 P0/P1/P2 加固后）**：`.venv/bin/ruff check .`、`.venv/bin/ruff format --check .`、`.venv/bin/mypy src/ndl`、`.venv/bin/pytest --cov=ndl --cov-report=term` 全绿；pytest 184 passed，coverage 88.96%。本次未重跑 `pre-commit run --all-files` / `uv lock --check`。

@@ -60,7 +60,14 @@ uv run playwright install chromium
 uv run ndl doctor browser
 ```
 
-The package has not been released to PyPI yet.
+The package has not been released to PyPI yet. The distribution name will be
+`noveldownloader` (the import path inside the package is still `ndl`, and the
+CLI entry point is still `ndl`). When v0.1 ships the install becomes:
+
+```bash
+pip install noveldownloader
+pip install 'noveldownloader[browser]'   # with optional Playwright fetcher
+```
 
 ## Usage
 

@@ -59,7 +59,13 @@ uv run playwright install chromium
 uv run ndl doctor browser
 ```
 
-当前尚未发布到 PyPI。
+当前尚未发布到 PyPI。发行名将是 `noveldownloader`（Python import 路径仍为
+`ndl`，CLI 命令仍为 `ndl`）。v0.1 发布后安装命令：
+
+```bash
+pip install noveldownloader
+pip install 'noveldownloader[browser]'   # 启用 Playwright 浏览器 fetcher
+```
 
 ## 使用
 

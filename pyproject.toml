@@ -1,5 +1,5 @@
 [project]
-name = "ndl"
+name = "noveldownloader"
 version = "0.1.0.dev0"
 description = "NOVELDOWNLOADER: rule-driven Chinese novel downloader and format converter"
 readme = "README.md"
