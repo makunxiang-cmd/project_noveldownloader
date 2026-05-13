@@ -50,14 +50,14 @@ Inspect the wheel before upload. It must include:
 Example inspection commands:
 
 ```bash
-python -m zipfile -l dist/noveldownloader-*.whl
-tar -tf dist/noveldownloader-*.tar.gz
+python -m zipfile -l dist/ndl_storykit-*.whl
+tar -tf dist/ndl_storykit-*.tar.gz
 ```
 
 Prefer the automated verifier for repeatable release-candidate checks:
 
 ```bash
-uv run python scripts/verify_distribution.py dist/noveldownloader-*.whl dist/noveldownloader-*.tar.gz
+uv run python scripts/verify_distribution.py dist/ndl_storykit-*.whl dist/ndl_storykit-*.tar.gz
 ```
 
 ## Install Smoke
@@ -70,7 +70,7 @@ smoke. The smoke never touches the network:
 # Required: install the wheel into an isolated venv
 python -m venv /tmp/ndl-smoke
 /tmp/ndl-smoke/bin/pip install --upgrade pip
-/tmp/ndl-smoke/bin/pip install dist/noveldownloader-*.whl
+/tmp/ndl-smoke/bin/pip install dist/ndl_storykit-*.whl
 
 # Run the smoke (validates --version, rules list, rules validate, doctor browser diagnostic)
 /tmp/ndl-smoke/bin/python scripts/smoke_cli.py --ndl /tmp/ndl-smoke/bin/ndl
@@ -79,7 +79,7 @@ python -m venv /tmp/ndl-smoke
 Optional browser smoke (slower; downloads Chromium on first run):
 
 ```bash
-/tmp/ndl-smoke/bin/pip install 'dist/noveldownloader-*.whl[browser]'
+/tmp/ndl-smoke/bin/pip install 'dist/ndl_storykit-*.whl[browser]'
 /tmp/ndl-smoke/bin/playwright install chromium
 /tmp/ndl-smoke/bin/python scripts/smoke_cli.py --ndl /tmp/ndl-smoke/bin/ndl --browser
 ```

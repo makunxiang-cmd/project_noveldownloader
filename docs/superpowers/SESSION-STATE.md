@@ -2,7 +2,7 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取活动的 release-prep plan，然后参考已完成的 P7/P6/P5 plan。
 >
-> 最后更新：2026-05-13（P7 全部 4 个 slice 完成、9 项预发布加固完成、PyPI 改名 `noveldownloader`、main 启用轻度分支保护、MkDocs Pages workflow 已就绪等 Pages source 切换。活动计划 `docs/superpowers/plans/2026-05-13-ndl-release-prep.md`）
+> 最后更新：2026-05-13（P7 全部 4 个 slice 完成、9 项预发布加固完成、PyPI 改名 `ndl-storykit`、main 启用轻度分支保护、MkDocs Pages workflow 已就绪等 Pages source 切换。活动计划 `docs/superpowers/plans/2026-05-13-ndl-release-prep.md`）
 
 ---
 
@@ -14,10 +14,10 @@
 
 - **当前状态**：P0-P7 全部实现 + 9 项预发布 P0/P1/P2 加固已实现 + Phase A (Pre-release setup) 3/6 已实现。**仓库已到达 release candidate state**，等待 maintainer 完成 A1+A2+Pages-Source 三件不可代理的 web UI 操作后即可进入 Phase B（release execution）。
 - **活动计划**：`docs/superpowers/plans/2026-05-13-ndl-release-prep.md` 列出了 A→E 五阶段的完整路线。新 session 进来先读这个 + 本文件。
-- **PyPI 命名**：`ndl` 名字 2016 年被无关项目 `msull/needle` 注册，故 v0.1 发行名 = **`noveldownloader`**。Python import (`from ndl...`) 与 CLI 入口 (`ndl`) 保持不变。已 `uv build` 生成 `noveldownloader-0.1.0.dev0` 工件并跑过 verifier + clean-venv smoke 全绿。
+- **PyPI 命名**：`ndl` 名字 2016 年被无关项目 `msull/needle` 注册，故 v0.1 发行名 = **`ndl-storykit`**。Python import (`from ndl...`) 与 CLI 入口 (`ndl`) 保持不变。已 `uv build` 生成 `ndl-storykit-0.1.0.dev0` 工件并跑过 verifier + clean-venv smoke 全绿。
 - **`main` 分支保护已开启**（轻度）：要求 PR，但 `required_approving_review_count = 0`；force-push / 删 main 禁用；CI status check 暂未列为 required（因 paths-ignore 会导致 doc-only PR 卡住）。**Agent 工作流：必须 `git checkout -b <topic>` → push → `gh pr create` → `gh pr merge --squash`**，不能再 `git push origin main`。`gh` CLI 已在本地装好并认证为 `makunxiang-cmd`。
 - **Phase A 进度**：
-  - A0 改名 `noveldownloader` ✅（commit `0b412af`）
+  - A0 改名 `ndl-storykit` ✅（commit `0b412af`）
   - A1 PyPI 账号 + 2FA ⏳ **等 maintainer 手动**
   - A2 PyPI API token ⏳ **等 maintainer 手动**（依赖 A1）
   - A3 main 分支保护 ✅ 已开
@@ -28,7 +28,7 @@
 - **最后完整验证（PyPI 改名后）**：`.venv/bin/ruff check .`、`.venv/bin/ruff format --check .`、`.venv/bin/mypy src/ndl`、`.venv/bin/pytest --cov=ndl --cov-report=term` 全绿；pytest **185 passed**，coverage **88.96%**。`uv run mkdocs build --strict --config-file docs/mkdocs.yml` 也零 warning 通过。
 - **加固后契约改动**：`SearchService.search()` 返回 `SearchOutcome(results, failures)` 而非 `list[SearchResult]`；调用方需通过 `outcome.results` / `outcome.failures` 访问。CLI 与 Web 均已适配。
 - **CI 状态**：main 上的最新 push（`aea9978`）CI 主 workflow 全绿（15/15 cells + lint）；Docs workflow build ✅、deploy ❌（Pages source 未启用，预期失败）。
-- **本地 Web 验证**：`ndl serve` 在 `127.0.0.1:8765` 做过 HTTP smoke check，首页 200，空 keyword 搜索 400。Playwright runtime 仍需使用者 `pip install 'noveldownloader[browser]'` + `playwright install chromium`。
+- **本地 Web 验证**：`ndl serve` 在 `127.0.0.1:8765` 做过 HTTP smoke check，首页 200，空 keyword 搜索 400。Playwright runtime 仍需使用者 `pip install 'ndl-storykit[browser]'` + `playwright install chromium`。
 
 ---
 

@@ -319,7 +319,7 @@ async def test_default_session_factory_reports_missing_playwright(
     with pytest.raises(BrowserError) as info:
         await _playwright_session(rule, {"User-Agent": "ndl-test"}, 30.0)
 
-    assert "pip install 'noveldownloader[browser]'" in info.value.user_message()
+    assert "pip install 'ndl-storykit[browser]'" in info.value.user_message()
     assert "playwright install chromium" in info.value.user_message()
 
 

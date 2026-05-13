@@ -59,12 +59,12 @@ uv run playwright install chromium
 uv run ndl doctor browser
 ```
 
-当前尚未发布到 PyPI。发行名将是 `noveldownloader`（Python import 路径仍为
+当前尚未发布到 PyPI。发行名将是 `ndl-storykit`（Python import 路径仍为
 `ndl`，CLI 命令仍为 `ndl`）。v0.1 发布后安装命令：
 
 ```bash
-pip install noveldownloader
-pip install 'noveldownloader[browser]'   # 启用 Playwright 浏览器 fetcher
+pip install ndl-storykit
+pip install 'ndl-storykit[browser]'   # 启用 Playwright 浏览器 fetcher
 ```
 
 ## 使用
