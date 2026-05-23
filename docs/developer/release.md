@@ -5,8 +5,8 @@ version on a `.dev0` suffix until the next release.
 
 ## Version Decision
 
-- Current package version: `0.2.0.dev0`
-- Latest public release: `0.1.0`
+- Current package version: `0.3.0.dev0`
+- Latest public release: `0.2.0`
 - Final release version bumps happen in a dedicated release commit after the
   preflight gates are green and release notes are reviewed.
 

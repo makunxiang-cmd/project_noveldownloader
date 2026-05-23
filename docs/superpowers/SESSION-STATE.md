@@ -2,9 +2,10 @@
 
 > 用途：跨会话接力的状态记录。新会话开始时，接手的 agent 应先读取本文件，再读取活动的 release-prep plan，然后参考已完成的 P7/P6/P5 plan。
 >
-> 最后更新：2026-05-13（v0.1.0 已发布：PyPI `ndl-storykit`、GitHub tag/release
-> `v0.1.0`、Pages 已部署；当前源码已推进到 `0.2.0.dev0`。活动计划
-> `docs/superpowers/plans/2026-05-13-ndl-release-prep.md` 进入发布后维护阶段）
+> 最后更新：2026-05-24（v0.2.0 已发布：PyPI `ndl-storykit`、GitHub tag/release
+> `v0.2.0`、Pages 已部署；当前源码已推进到 `0.3.0.dev0`。v0.2.0 完成
+> 11 项下游驱动改进：见 `docs/agents/downstream-feedback/2026-05-23-ndl-desktop.md`
+> 与 `docs/release-notes/v0.2.md`）
 
 ---
 
@@ -14,11 +15,15 @@
 
 ## 0.1 下个 agent 快速接手摘要
 
-- **当前状态**：P0-P7 全部实现 + 9 项预发布 P0/P1/P2 加固已实现。
-  v0.1.0 已由 maintainer 发布到 GitHub Release 和 PyPI；当前源码版本已回到
-  **`0.2.0.dev0`**。
-- **活动计划**：`docs/superpowers/plans/2026-05-13-ndl-release-prep.md` 已记录
-  从 release candidate 到 published v0.1.0 的路线；当前进入 Phase E 日常维护。
+- **当前状态**：P0-P7 全部实现 + 9 项预发布 P0/P1/P2 加固已实现 + 11 项
+  下游驱动的 0.2 改进（browser lifecycle、pagination、archive、POST/browser
+  search、update alignment、TXT import QoL、container pick、styled EPUB、
+  schema 文档、packaging hygiene）已落地。v0.1.0 与 v0.2.0 均已由 maintainer
+  发布到 GitHub Release 和 PyPI；当前源码版本已回到 **`0.3.0.dev0`**。
+- **活动计划**：v0.2.0 发布执行参见
+  `docs/superpowers/plans/2026-05-24-0.2-release-finalization.md` 与
+  `docs/superpowers/specs/2026-05-24-0.2-release-finalization-design.md`；
+  后续维护沿用 `docs/superpowers/plans/2026-05-13-ndl-release-prep.md` Phase E。
 - **PyPI 命名**：`ndl` 名字 2016 年被无关项目 `msull/needle` 注册，`noveldownloader`
   又被 PyPI 判定过于接近既有 `novel-downloader`，故 v0.1 发行名 =
   **`ndl-storykit`**。Python import (`from ndl...`) 与 CLI 入口 (`ndl`) 保持不变。

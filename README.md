@@ -10,9 +10,9 @@
 
 ## Status
 
-v0.1.0 is published on PyPI as `ndl-storykit`. The current source tree is back
-on the next development version, `0.2.0.dev0`, after shipping the first public
-release. Implemented surfaces include download, TXT/EPUB convert, library
+v0.2.0 is the latest release published on PyPI as `ndl-storykit`. The current
+source tree is back on the next development version, `0.3.0.dev0`, after
+shipping v0.2.0. Implemented surfaces include download, TXT/EPUB convert, library
 management, search, rule updates, optional browser rendering for supported
 rules, local Web UI, and auditable packaging checks. See
 `docs/superpowers/SESSION-STATE.md` for the current handoff snapshot.

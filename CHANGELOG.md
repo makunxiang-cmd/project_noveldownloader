@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Post-release housekeeping after v0.2.0: development version advanced to
+  `0.3.0.dev0`; README, MkDocs home, developer guide, release runbook, AGENTS,
+  SESSION-STATE, and the public design-spec note now describe v0.2.0 as the
+  latest PyPI release and `0.3.0.dev0` as the active development cycle.
+
 ## [0.2.0] - 2026-05-24
 
 ### Changed

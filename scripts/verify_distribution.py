@@ -81,7 +81,7 @@ def _verify_wheel(path: Path) -> list[str]:
 def _verify_metadata(metadata: Message) -> list[str]:
     failures: list[str] = []
     version = metadata["Version"]
-    if version != "0.2.0":
+    if version != "0.3.0.dev0":
         failures.append(f"unexpected package version: {version}")
     extras = set(metadata.get_all("Provides-Extra", []))
     missing_extras = REQUIRED_EXTRAS - extras

@@ -11,11 +11,11 @@
 | License | MIT |
 | 设计文档版本 | 1.0 |
 
-> Historical note, 2026-05-13: this document records the original design
-> direction from April 2026. The implementation has since shipped v0.1.0 on
-> PyPI as `ndl-storykit`, and the source tree is on `0.2.0.dev0` for the next
-> development cycle. Treat older package/version examples below as design
-> history; use the home page, user guide, developer guide, and
+> Historical note, 2026-05-24: this document records the original design
+> direction from April 2026. The implementation has since shipped v0.1.0 and
+> v0.2.0 on PyPI as `ndl-storykit`, and the source tree is on `0.3.0.dev0` for
+> the next development cycle. Treat older package/version examples below as
+> design history; use the home page, user guide, developer guide, and
 > `docs/superpowers/SESSION-STATE.md` for current status.
 
 ---
@@ -632,7 +632,7 @@ build-backend = "hatchling.build"
 | **P7 Release Candidate Verification** | wheel/sdist verifier / release notes / install smoke strategy / release execution gate | 已完成 | 可重复构建并校验 release artifacts；v0.1.0 已由 maintainer 发布 |
 | **P8+ / 0.2+** | Docker 镜像 / 更多内置规则 / UX 打磨 / 批量导出 / i18n | 持续 | 后续版本规划 |
 
-**MVP 功能已随 v0.1.0 发布到 PyPI，发行名为 `ndl-storykit`。当前源码版本为 `0.2.0.dev0`。**
+**MVP 功能已随 v0.1.0 发布到 PyPI；v0.2.0 已合入 11 项下游驱动改进并发布。发行名为 `ndl-storykit`。当前源码版本为 `0.3.0.dev0`。**
 
 ### 9.1 MVP (v0.1) vs v1.0 能力对照
 

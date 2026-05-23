@@ -2,8 +2,8 @@
 
 Welcome to the NDL documentation.
 
-**Status:** v0.1.0 is published on PyPI as `ndl-storykit`, and the current
-source tree is back on `0.2.0.dev0` for the next development cycle. P0-P7 are
+**Status:** v0.2.0 is the latest release on PyPI as `ndl-storykit`, and the
+current source tree is back on `0.3.0.dev0` for the next development cycle. P0-P7 are
 implemented, covering scaffold, MVP download/convert, library persistence,
 local Web UI, updates, search, remote rule updates, optional browser rendering,
 diagnostics, release hardening, release notes, install smoke checks, and
