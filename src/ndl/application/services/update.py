@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Literal
 
 from ndl.application.services._progress import emit_progress
+from ndl.application.services.download import DownloadService
 from ndl.application.services.library import LibraryService
 from ndl.core.errors import NDLError, UserError
-from ndl.core.models import Chapter, ChapterStub
+from ndl.core.models import Chapter
 from ndl.core.progress import ProgressCallback
 from ndl.core.protocols import Fetcher, Parser
 from ndl.rules import SourceRule
@@ -131,6 +131,12 @@ class UpdateService:
         rule = self._rule_for(novel.source_url)
         fetcher = pool.for_rule(rule)
         parser = self._parser_factory(rule)
+        downloader = DownloadService(
+            fetcher=fetcher,
+            parser=parser,
+            rule=rule,
+            progress=self._progress,
+        )
         await emit_progress(
             self._progress,
             kind="stage",
@@ -139,10 +145,9 @@ class UpdateService:
             done=0,
             message=f"Checking updates: {novel.title}",
         )
-        index_html = await fetcher.get(novel.source_url)
-        latest, stubs = parser.parse_index(index_html, source_url=novel.source_url)
-        stored_indices = {chapter.index for chapter in novel.chapters}
-        new_stubs = [stub for stub in stubs if stub.index not in stored_indices]
+        latest, stubs = await downloader.fetch_index_only(novel.source_url)
+        stored_urls = _stored_chapter_urls(novel.chapters)
+        new_stubs = [stub for stub in stubs if _normalize_url(stub.url) not in stored_urls]
         if not new_stubs:
             if latest.status != novel.status:
                 self._library.append_chapters(
@@ -176,7 +181,17 @@ class UpdateService:
             done=0,
             message=f"Fetching {len(new_stubs)} new chapter(s).",
         )
-        chapters = await self._fetch_chapters(fetcher, parser, new_stubs)
+        if rule.download_archive is not None:
+            candidates = await downloader.fetch_chapters(stubs, source_url=novel.source_url)
+            chapters = [
+                chapter
+                for chapter in candidates
+                if chapter.source_url is not None
+                and _normalize_url(chapter.source_url) not in stored_urls
+            ]
+        else:
+            chapters = await downloader.fetch_chapters(new_stubs, source_url=novel.source_url)
+        chapters = _reindex_for_append(chapters, after=novel.chapters)
         await emit_progress(
             self._progress,
             kind="stage",
@@ -209,34 +224,20 @@ class UpdateService:
             message=None if appended else "No new chapters.",
         )
 
-    async def _fetch_chapters(
-        self,
-        fetcher: Fetcher,
-        parser: Parser,
-        stubs: list[ChapterStub],
-    ) -> list[Chapter]:
-        tasks = [asyncio.create_task(_fetch_chapter(fetcher, parser, stub)) for stub in stubs]
-        chapters: list[Chapter] = []
-        try:
-            for coro in asyncio.as_completed(tasks):
-                chapter = await coro
-                chapters.append(chapter)
-                await emit_progress(
-                    self._progress,
-                    kind="chapter",
-                    stage="fetching_chapters",
-                    total=len(stubs),
-                    done=len(chapters),
-                    current_title=chapter.title,
-                )
-        finally:
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-        return chapters
+
+def _stored_chapter_urls(chapters: list[Chapter]) -> set[str]:
+    return {
+        _normalize_url(chapter.source_url) for chapter in chapters if chapter.source_url is not None
+    }
 
 
-async def _fetch_chapter(fetcher: Fetcher, parser: Parser, stub: ChapterStub) -> Chapter:
-    chapter_html = await fetcher.get(stub.url)
-    return parser.parse_chapter(chapter_html, index=stub.index, source_url=stub.url)
+def _reindex_for_append(chapters: list[Chapter], *, after: list[Chapter]) -> list[Chapter]:
+    next_index = max((chapter.index for chapter in after), default=-1) + 1
+    return [
+        chapter.model_copy(update={"index": next_index + offset})
+        for offset, chapter in enumerate(sorted(chapters, key=lambda item: item.index))
+    ]
+
+
+def _normalize_url(url: str) -> str:
+    return url.strip()
