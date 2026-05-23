@@ -26,7 +26,7 @@ Install from PyPI with `pip install ndl-storykit`, or
 ### Validate a source rule
 
 ```bash
-uv run ndl rules validate src/ndl/builtin_rules/example_static.yaml
+uv run ndl rules validate path/to/rule.yaml
 ```
 
 ### Convert a local TXT file
@@ -46,9 +46,9 @@ uv run ndl download https://example-novels.test/book/123 -o book.epub --no-save
 By default a successful download is also persisted into the local SQLite library
 (`~/.ndl/library.db`). Pass `--no-save` to keep the file-only behavior of P1.
 
-The bundled `example_static` rule is fixture-backed and intended for contract
-tests. Real site coverage remains deliberately limited until compliant
-public-domain rules are added.
+The default package intentionally ships without demo site rules. Install rules
+under `<NDL_HOME>/rules/` or validate local YAML files explicitly before using
+them.
 
 Rules can opt into browser-backed rendering with `fetcher.type: browser`.
 This path uses Playwright only when the optional `browser` extra is installed;
@@ -87,15 +87,15 @@ uv run ndl update --all --accept-disclaimer
 ```
 
 `update --all` checks every saved non-completed library entry that has a source
-URL, reloads the index page, fetches only chapters whose indices are not already
-stored, and appends them to the SQLite library. Completed novels and local-only
-entries are skipped.
+URL, reloads the rule-defined index pipeline, diffs chapters by source URL, and
+appends only new chapters to the SQLite library. Completed novels and
+local-only entries are skipped.
 
 ### Search rule-defined sources
 
 ```bash
 uv run ndl search "keyword"
-uv run ndl search "keyword" --rule example_static --limit 10
+uv run ndl search "keyword" --rule <rule-id> --limit 10
 ```
 
 `search` queries every enabled rule that declares a search endpoint and prints
@@ -112,7 +112,7 @@ and message.
 uv run ndl rules list
 ```
 
-Prints a table of every bundled and user-installed rule with id, name, version, enabled flag, whether it declares a search endpoint, fetcher type, and URL pattern count.
+Prints a table of every loaded rule with id, name, version, enabled flag, whether it declares a search endpoint, fetcher type, and URL pattern count. A fresh install may print `No rules loaded.` until user rules are installed.
 
 ### Update remote source rules
 
@@ -127,7 +127,7 @@ checks optional SHA-256 digests, validates the full rule bundle, and prints a
 summary before writing anything. Invalid bundles never replace existing files.
 
 Installed rules are written to `<NDL_HOME>/rules/<rule-id>.yaml` and override
-bundled rules with the same id. There is no bundled default remote feed yet, so
+production builtin rules with the same id if any are added in the future. There is no bundled default remote feed yet, so
 pass `--manifest-url` or set `NDL_RULES_MANIFEST_URL`.
 
 Both the manifest URL and every resolved rule URL must use `https`. Set

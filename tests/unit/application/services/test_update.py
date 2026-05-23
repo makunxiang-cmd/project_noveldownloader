@@ -11,8 +11,8 @@ import pytest
 from ndl.application.container import ServiceContainer
 from ndl.core.models import Chapter, Novel
 from ndl.core.progress import ProgressEvent
-from ndl.rules.loader import load_builtin_rules
 from ndl.rules.schema import ArchiveDownloadRule, PaginationRule, Selector, SourceRule
+from tests.rule_fixtures import load_example_static_rule
 
 BASE_URL = "https://example-novels.test/book/123"
 FIXTURE_DIR = Path(__file__).parents[3] / "contract" / "fixtures" / "example_static"
@@ -48,7 +48,7 @@ class FakeFetcher:
 
 @pytest.mark.asyncio
 async def test_update_all_appends_only_missing_chapters(tmp_path: Path) -> None:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    rule = load_example_static_rule()
     chapter_two = (
         (FIXTURE_DIR / "chapter.html")
         .read_text(encoding="utf-8")
@@ -96,7 +96,7 @@ async def test_update_all_appends_only_missing_chapters(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_update_all_reuses_fetcher_across_novels_with_same_rule(tmp_path: Path) -> None:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    rule = load_example_static_rule()
     index_html = (FIXTURE_DIR / "index.html").read_text(encoding="utf-8")
     chapter_two = (
         (FIXTURE_DIR / "chapter.html")
@@ -166,7 +166,7 @@ async def test_update_all_reuses_fetcher_across_novels_with_same_rule(tmp_path: 
 
 @pytest.mark.asyncio
 async def test_update_uses_url_diff_when_remote_indices_shift(tmp_path: Path) -> None:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    rule = load_example_static_rule()
     chapter_zero_url = f"{BASE_URL}/chapter/0"
     chapter_one_url = f"{BASE_URL}/chapter/1"
     fetcher = FakeFetcher(
@@ -341,7 +341,7 @@ async def test_update_uses_archive_pipeline_and_appends_only_new_tail(tmp_path: 
 
 @pytest.mark.asyncio
 async def test_update_all_skips_completed_and_sourceless_entries(tmp_path: Path) -> None:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    rule = load_example_static_rule()
     fetcher = FakeFetcher({})
     with ServiceContainer(
         rules=[rule],
@@ -388,7 +388,7 @@ def _example_rule(
     chapter_pagination: PaginationRule | None = None,
     archive: ArchiveDownloadRule | None = None,
 ) -> SourceRule:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    rule = load_example_static_rule()
     index = rule.index
     chapter = rule.chapter
     if index_pagination is not None:

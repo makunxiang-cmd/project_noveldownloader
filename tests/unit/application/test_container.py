@@ -10,8 +10,8 @@ from ndl.application.services import ConvertService, LibraryService
 from ndl.core.models import Chapter, ChapterStub, Novel
 from ndl.core.protocols import Fetcher, Parser
 from ndl.fetchers import BrowserFetcher, HttpFetcher
-from ndl.rules.loader import load_builtin_rules
 from ndl.rules.schema import SourceRule
+from tests.rule_fixtures import load_example_static_rule
 
 BASE_URL = "https://example-novels.test/book/123"
 
@@ -39,7 +39,7 @@ class DummyParser:
 
 
 def test_container_resolves_rule_and_builds_dependencies() -> None:
-    rules = load_builtin_rules()
+    rules = [load_example_static_rule()]
 
     def fetcher_factory(rule: SourceRule) -> Fetcher:
         assert rule.id == "example_static"
@@ -62,13 +62,13 @@ def test_container_resolves_rule_and_builds_dependencies() -> None:
 
 
 def test_container_lists_loaded_rules_in_resolution_order() -> None:
-    container = ServiceContainer(rules=load_builtin_rules())
+    container = ServiceContainer(rules=[load_example_static_rule()])
 
     assert [rule.id for rule in container.list_rules()] == ["example_static"]
 
 
 def test_default_fetcher_uses_rule_fetcher_type() -> None:
-    http_rule = load_builtin_rules()[0]
+    http_rule = load_example_static_rule()
     browser_rule = http_rule.model_copy(
         update={"fetcher": http_rule.fetcher.model_copy(update={"type": "browser"})}
     )

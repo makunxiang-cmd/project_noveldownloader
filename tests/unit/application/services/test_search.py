@@ -9,8 +9,8 @@ import pytest
 from ndl.application.container import ServiceContainer
 from ndl.application.services.search import SearchService
 from ndl.core.errors import NetworkError
-from ndl.rules.loader import load_builtin_rules
 from ndl.rules.schema import SourceRule
+from tests.rule_fixtures import load_example_static_rule
 
 SEARCH_HTML = """
 <html><body>
@@ -88,7 +88,7 @@ class FakeBrowserSearchFetcher:
 
 @pytest.mark.asyncio
 async def test_search_returns_results_from_rule_with_search() -> None:
-    rule = next(r for r in load_builtin_rules() if r.id == "example_static")
+    rule = load_example_static_rule()
     fetcher = FakeFetcher(SEARCH_HTML)
     service = SearchService(rules=[rule], fetcher_factory=lambda _r: fetcher)
 
@@ -102,7 +102,7 @@ async def test_search_returns_results_from_rule_with_search() -> None:
 
 @pytest.mark.asyncio
 async def test_search_url_encodes_keyword() -> None:
-    rule = next(r for r in load_builtin_rules() if r.id == "example_static")
+    rule = load_example_static_rule()
     fetcher = FakeFetcher(EMPTY_HTML)
     service = SearchService(rules=[rule], fetcher_factory=lambda _r: fetcher)
 
@@ -145,7 +145,7 @@ async def test_search_uses_browser_search_flow() -> None:
 
 @pytest.mark.asyncio
 async def test_search_skips_rules_without_search_block() -> None:
-    rule = next(r for r in load_builtin_rules() if r.id == "example_static")
+    rule = load_example_static_rule()
     rule_no_search = rule.model_copy(update={"id": "no_search", "search": None})
     fetcher = FakeFetcher(SEARCH_HTML)
     calls: list[str] = []
@@ -164,7 +164,7 @@ async def test_search_skips_rules_without_search_block() -> None:
 
 @pytest.mark.asyncio
 async def test_search_filters_by_rule_ids() -> None:
-    rule = next(r for r in load_builtin_rules() if r.id == "example_static")
+    rule = load_example_static_rule()
     fetcher = FakeFetcher(EMPTY_HTML)
     service = SearchService(rules=[rule], fetcher_factory=lambda _r: fetcher)
 
@@ -177,7 +177,7 @@ async def test_search_filters_by_rule_ids() -> None:
 
 @pytest.mark.asyncio
 async def test_search_returns_empty_list_when_no_results() -> None:
-    rule = next(r for r in load_builtin_rules() if r.id == "example_static")
+    rule = load_example_static_rule()
     fetcher = FakeFetcher(EMPTY_HTML)
     service = SearchService(rules=[rule], fetcher_factory=lambda _r: fetcher)
 
@@ -189,7 +189,7 @@ async def test_search_returns_empty_list_when_no_results() -> None:
 
 @pytest.mark.asyncio
 async def test_search_deduplicates_results_by_rule_and_url() -> None:
-    rule = next(r for r in load_builtin_rules() if r.id == "example_static")
+    rule = load_example_static_rule()
     duplicate_html = SEARCH_HTML.replace('/book/2">View', '/book/1">View')
     fetcher = FakeFetcher(duplicate_html)
     service = SearchService(rules=[rule], fetcher_factory=lambda _r: fetcher)
@@ -201,7 +201,7 @@ async def test_search_deduplicates_results_by_rule_and_url() -> None:
 
 @pytest.mark.asyncio
 async def test_search_service_via_container() -> None:
-    rule = next(r for r in load_builtin_rules() if r.id == "example_static")
+    rule = load_example_static_rule()
     fetcher = FakeFetcher(SEARCH_HTML)
     container = ServiceContainer(
         rules=[rule],
@@ -227,7 +227,7 @@ class FailingFetcher:
 
 @pytest.mark.asyncio
 async def test_search_collects_failures_without_dropping_successes() -> None:
-    base_rule = next(r for r in load_builtin_rules() if r.id == "example_static")
+    base_rule = load_example_static_rule()
     failing_rule = base_rule.model_copy(update={"id": "broken_rule"})
     ok_fetcher = FakeFetcher(SEARCH_HTML)
     fail_fetcher = FailingFetcher()
@@ -247,7 +247,7 @@ async def test_search_collects_failures_without_dropping_successes() -> None:
 
 @pytest.mark.asyncio
 async def test_search_returns_only_failures_when_all_sources_fail() -> None:
-    base_rule = next(r for r in load_builtin_rules() if r.id == "example_static")
+    base_rule = load_example_static_rule()
     service = SearchService(rules=[base_rule], fetcher_factory=lambda _r: FailingFetcher())
 
     outcome = await service.search("west")
@@ -257,7 +257,7 @@ async def test_search_returns_only_failures_when_all_sources_fail() -> None:
 
 
 def _post_search_rule() -> SourceRule:
-    base = next(r for r in load_builtin_rules() if r.id == "example_static")
+    base = load_example_static_rule()
     data = base.model_dump(mode="json")
     data["search"] = {
         "method": "POST",
@@ -275,7 +275,7 @@ def _post_search_rule() -> SourceRule:
 
 
 def _browser_search_rule() -> SourceRule:
-    base = next(r for r in load_builtin_rules() if r.id == "example_static")
+    base = load_example_static_rule()
     data = base.model_dump(mode="json")
     fetcher = data["fetcher"]
     assert isinstance(fetcher, dict)

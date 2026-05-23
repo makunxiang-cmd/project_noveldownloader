@@ -61,7 +61,7 @@ def load_rule_text(text: str, *, source_name: str) -> SourceRule:
 
 
 def load_builtin_rules() -> list[SourceRule]:
-    """Load YAML rules bundled inside the package."""
+    """Load production YAML rules bundled inside the package."""
     rules_package = resources.files("ndl.builtin_rules")
     rules = []
     for rule_path in sorted(rules_package.iterdir(), key=lambda item: item.name):
@@ -72,7 +72,7 @@ def load_builtin_rules() -> list[SourceRule]:
 
 
 def load_default_rules(*, user_rules_path: Path | None = None) -> list[SourceRule]:
-    """Load bundled rules plus user-installed overrides."""
+    """Load production bundled rules plus user-installed overrides."""
     loaded: dict[str, tuple[int, SourceRule]] = {
         rule.id: (0, rule) for rule in load_builtin_rules()
     }

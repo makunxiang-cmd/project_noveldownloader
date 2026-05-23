@@ -6,9 +6,9 @@ import pytest
 
 from ndl.core.errors import SelectorNotFoundError
 from ndl.parsers.html_search import parse_search
-from ndl.rules.loader import load_builtin_rules
+from tests.rule_fixtures import load_example_static_rule
 
-RULE = next(r for r in load_builtin_rules() if r.id == "example_static")
+RULE = load_example_static_rule()
 
 BASE_URL = "https://example-novels.test/search?q=test"
 
