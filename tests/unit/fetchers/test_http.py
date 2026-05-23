@@ -98,6 +98,21 @@ async def test_get_decodes_with_explicit_gbk(rule: SourceRule) -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_get_bytes_returns_raw_response_body(rule: SourceRule) -> None:
+    payload = b"\xff\x00archive"
+    route = respx.get("https://site.test/archive.txt").mock(
+        return_value=httpx.Response(200, content=payload)
+    )
+
+    async with HttpFetcher(rule) as fetcher:
+        content = await fetcher.get_bytes("https://site.test/archive.txt")
+
+    assert content == payload
+    assert route.calls.last.request.headers["user-agent"] == "ndl-test/1.0"
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_get_retries_on_5xx_then_succeeds(rule: SourceRule) -> None:
     route = respx.get("https://site.test/page").mock(
         side_effect=[

@@ -14,6 +14,8 @@ BackoffType = Literal["fixed", "exponential"]
 EncodingName = Literal["utf-8", "gbk", "gb18030", "auto"]
 BrowserWaitUntil = Literal["commit", "domcontentloaded", "load", "networkidle"]
 PaginationType = Literal["none", "next", "index-template"]
+ArchiveFormat = Literal["txt"]
+ArchiveTriggerType = Literal["url-template", "selector"]
 SelectorAttr = Literal["text", "html", "href", "src"]
 ResolveMode = Literal["none", "relative"]
 
@@ -215,6 +217,44 @@ class ChapterRule(StrictModel):
     pagination: PaginationRule = Field(default_factory=PaginationRule)
 
 
+class ArchiveDownloadRule(StrictModel):
+    """Whole-book archive download configuration."""
+
+    format: ArchiveFormat = "txt"
+    trigger: ArchiveTriggerType
+    url_template: str | None = None
+    selector: str | None = None
+    encodings: list[str] = Field(
+        default_factory=lambda: ["utf-8-sig", "gb18030", "gbk"],
+        min_length=1,
+    )
+    strip_patterns: list[str] = Field(default_factory=list)
+
+    @field_validator("strip_patterns")
+    @classmethod
+    def _strip_patterns_compile(cls, values: list[str]) -> list[str]:
+        for value in values:
+            try:
+                re.compile(value)
+            except re.error as exc:
+                raise ValueError(f"invalid archive strip pattern: {exc}") from exc
+        return values
+
+    @model_validator(mode="after")
+    def _trigger_field_matches_trigger_type(self) -> ArchiveDownloadRule:
+        if self.trigger == "url-template":
+            if not self.url_template:
+                raise ValueError("download_archive.url_template is required for url-template")
+            if self.selector is not None:
+                raise ValueError("download_archive.selector is only valid for selector")
+        if self.trigger == "selector":
+            if not self.selector:
+                raise ValueError("download_archive.selector is required for selector")
+            if self.url_template is not None:
+                raise ValueError("download_archive.url_template is only valid for url-template")
+        return self
+
+
 class SearchFields(StrictModel):
     """Search result field selectors."""
 
@@ -245,16 +285,24 @@ class SourceRule(StrictModel):
     fetcher: FetcherRule = Field(default_factory=FetcherRule)
     index: IndexRule
     chapter: ChapterRule
+    download_archive: ArchiveDownloadRule | None = None
     search: SearchRule | None = None
 
     @model_validator(mode="after")
-    def _url_regexes_compile(self) -> SourceRule:
+    def _validate_cross_rule_constraints(self) -> SourceRule:
         for pattern in self.url_patterns:
             if pattern.type == "regex":
                 try:
                     re.compile(pattern.pattern)
                 except re.error as exc:
                     raise ValueError(f"invalid URL regex: {exc}") from exc
+        if self.download_archive is not None:
+            if self.index.pagination.type != "none":
+                raise ValueError("download_archive cannot be combined with index.pagination")
+            if self.download_archive.trigger == "selector" and self.fetcher.type != "browser":
+                raise ValueError(
+                    "download_archive selector trigger requires fetcher.type='browser'"
+                )
         return self
 
     def matches(self, url: str) -> bool:

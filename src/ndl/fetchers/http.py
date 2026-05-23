@@ -59,11 +59,19 @@ class HttpFetcher:
 
     async def get(self, url: str, *, encoding: str | None = None) -> str:
         """Fetch `url` honoring the rule's policies and return decoded text."""
+        response = await self._get_response(url)
+        return self._decode(response, encoding)
+
+    async def get_bytes(self, url: str) -> bytes:
+        """Fetch `url` honoring the rule's policies and return raw bytes."""
+        response = await self._get_response(url)
+        return response.content
+
+    async def _get_response(self, url: str) -> httpx.Response:
         if self._robots is not None:
             await self._robots.check(url)
         async with self._throttle_for(url).slot():
-            response = await self._fetch_with_retry(url)
-        return self._decode(response, encoding)
+            return await self._fetch_with_retry(url)
 
     def _throttle_for(self, url: str) -> HostThrottle:
         host = urlparse(url).netloc

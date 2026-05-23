@@ -61,9 +61,16 @@ chapter:
 
 
 class FakeBrowserSession:
-    def __init__(self, responses: list[tuple[int | None, str]]) -> None:
+    def __init__(
+        self,
+        responses: list[tuple[int | None, str]],
+        *,
+        downloads: list[tuple[int | None, bytes]] | None = None,
+    ) -> None:
         self.responses = responses
+        self.download_responses = downloads or []
         self.urls: list[str] = []
+        self.downloads: list[tuple[str, str]] = []
         self.closed = False
 
     async def get_html(self, url: str) -> tuple[int | None, str]:
@@ -71,6 +78,12 @@ class FakeBrowserSession:
         if len(self.responses) > 1:
             return self.responses.pop(0)
         return self.responses[0]
+
+    async def download_bytes(self, url: str, selector: str) -> tuple[int | None, bytes]:
+        self.downloads.append((url, selector))
+        if len(self.download_responses) > 1:
+            return self.download_responses.pop(0)
+        return self.download_responses[0]
 
     async def aclose(self) -> None:
         self.closed = True
@@ -81,10 +94,13 @@ class FakePlaywrightResponse:
 
 
 class FakePlaywrightPage:
-    def __init__(self) -> None:
+    def __init__(self, *, download_path: Path | None = None) -> None:
         self.goto_calls: list[dict[str, object]] = []
         self.wait_selectors: list[dict[str, object]] = []
         self.wait_timeouts: list[int] = []
+        self.download_timeouts: list[float] = []
+        self.clicked_selectors: list[dict[str, object]] = []
+        self._download_path = download_path
         self.closed = False
 
     async def goto(self, url: str, *, wait_until: str, timeout: float) -> FakePlaywrightResponse:
@@ -100,8 +116,51 @@ class FakePlaywrightPage:
     async def content(self) -> str:
         return "<html>ready</html>"
 
+    def expect_download(self, *, timeout: float) -> FakeDownloadContext:
+        assert self._download_path is not None
+        self.download_timeouts.append(timeout)
+        return FakeDownloadContext(self._download_path)
+
+    def locator(self, selector: str) -> FakeLocator:
+        return FakeLocator(self, selector)
+
     async def close(self) -> None:
         self.closed = True
+
+
+class FakeDownload:
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    async def path(self) -> str:
+        return str(self._path)
+
+
+class FakeDownloadContext:
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    async def __aenter__(self) -> FakeDownloadContext:
+        return self
+
+    async def __aexit__(self, *_exc_info: object) -> None:
+        return None
+
+    @property
+    def value(self) -> object:
+        async def _value() -> FakeDownload:
+            return FakeDownload(self._path)
+
+        return _value()
+
+
+class FakeLocator:
+    def __init__(self, page: FakePlaywrightPage, selector: str) -> None:
+        self._page = page
+        self._selector = selector
+
+    async def click(self, *, timeout: float) -> None:
+        self._page.clicked_selectors.append({"selector": self._selector, "timeout": timeout})
 
 
 class FakePlaywrightContext:
@@ -225,6 +284,23 @@ async def test_get_retries_5xx_then_returns_rendered_html(rule: SourceRule) -> N
 
 
 @pytest.mark.asyncio
+async def test_get_download_bytes_clicks_selector(rule: SourceRule) -> None:
+    session = FakeBrowserSession([(200, "unused")], downloads=[(200, b"archive")])
+
+    async def session_factory(
+        _source_rule: SourceRule, _headers: dict[str, str], _timeout: float
+    ) -> FakeBrowserSession:
+        return session
+
+    async with BrowserFetcher(rule, session_factory=session_factory) as fetcher:
+        content = await fetcher.get_download_bytes("https://site.test/book", "a.download")
+
+    assert content == b"archive"
+    assert session.downloads == [("https://site.test/book", "a.download")]
+    assert session.closed is True
+
+
+@pytest.mark.asyncio
 async def test_get_uses_browser_navigation_timeout_from_rule(tmp_path: Path) -> None:
     yaml = RULE_YAML.replace(
         "  encoding: auto\n",
@@ -293,6 +369,47 @@ async def test_playwright_session_uses_rule_browser_wait_controls() -> None:
     ]
     assert page.wait_selectors == [{"selector": "#ready", "timeout": 15000}]
     assert page.wait_timeouts == [250]
+    assert page.closed is True
+    assert context.closed is True
+    assert browser.closed is True
+    assert playwright.closed is True
+
+
+@pytest.mark.asyncio
+async def test_playwright_session_downloads_bytes_from_selector(tmp_path: Path) -> None:
+    archive_path = tmp_path / "archive.txt"
+    archive_path.write_bytes(b"archive bytes")
+    page = FakePlaywrightPage(download_path=archive_path)
+    context = FakePlaywrightContext(page)
+    browser = FakeClosable()
+    playwright = FakeClosable()
+    session = _PlaywrightBrowserSession(
+        playwright=playwright,
+        browser=browser,
+        context=context,
+        timeout_ms=15000,
+        wait_until="domcontentloaded",
+        wait_for_selector="#ready",
+        extra_wait_ms=250,
+        error_types=(RuntimeError,),
+    )
+
+    status, content = await session.download_bytes("https://site.test/book", "a.download")
+    await session.aclose()
+
+    assert status == 200
+    assert content == b"archive bytes"
+    assert page.goto_calls == [
+        {
+            "url": "https://site.test/book",
+            "wait_until": "domcontentloaded",
+            "timeout": 15000,
+        }
+    ]
+    assert page.wait_selectors == [{"selector": "#ready", "timeout": 15000}]
+    assert page.wait_timeouts == [250]
+    assert page.download_timeouts == [15000]
+    assert page.clicked_selectors == [{"selector": "a.download", "timeout": 15000}]
     assert page.closed is True
     assert context.closed is True
     assert browser.closed is True

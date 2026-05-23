@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
 from types import TracebackType
 from typing import Any, Protocol
 from urllib.parse import urlparse
@@ -24,6 +25,9 @@ class BrowserSession(Protocol):
 
     async def get_html(self, url: str) -> tuple[int | None, str]:
         """Navigate to `url` and return the response status and rendered HTML."""
+
+    async def download_bytes(self, url: str, selector: str) -> tuple[int | None, bytes]:
+        """Navigate to `url`, click `selector`, and return downloaded bytes."""
 
     async def aclose(self) -> None:
         """Release browser resources."""
@@ -98,6 +102,13 @@ class BrowserFetcher:
         async with self._throttle_for(url).slot():
             return await self._fetch_with_retry(url)
 
+    async def get_download_bytes(self, url: str, selector: str) -> bytes:
+        """Render `url`, click `selector`, and return downloaded bytes."""
+        if self._robots is not None:
+            await self._robots.check(url)
+        async with self._throttle_for(url).slot():
+            return await self._download_with_retry(url, selector)
+
     async def _ensure_session(self) -> BrowserSession:
         if self._session is None:
             self._session = await self._session_factory(self._rule, self._headers, self._timeout)
@@ -135,6 +146,33 @@ class BrowserFetcher:
                     raise HTTPError(url, status_code)
                 else:
                     return html
+            if attempt + 1 < retry.attempts:
+                await asyncio.sleep(backoff_delay(retry, attempt))
+        assert last_exc is not None
+        raise last_exc
+
+    async def _download_with_retry(self, url: str, selector: str) -> bytes:
+        retry = self._rule.fetcher.retry
+        last_exc: NDLError | None = None
+        for attempt in range(retry.attempts):
+            try:
+                status_code, content = await (await self._ensure_session()).download_bytes(
+                    url, selector
+                )
+            except BrowserError as exc:
+                last_exc = exc
+            else:
+                if status_code == 429:
+                    last_exc = RateLimitedError(
+                        "Upstream rate-limited the request (HTTP 429).",
+                        detail=f"URL: {url}",
+                    )
+                elif status_code is not None and status_code >= 500:
+                    last_exc = HTTPError(url, status_code)
+                elif status_code is not None and status_code >= 400:
+                    raise HTTPError(url, status_code)
+                else:
+                    return content
             if attempt + 1 < retry.attempts:
                 await asyncio.sleep(backoff_delay(retry, attempt))
         assert last_exc is not None
@@ -239,6 +277,32 @@ class _PlaywrightBrowserSession:
         finally:
             await page.close()
         return status_code, html
+
+    async def download_bytes(self, url: str, selector: str) -> tuple[int | None, bytes]:
+        page = await self._context.new_page()
+        try:
+            response = await page.goto(
+                url,
+                wait_until=self._wait_until,
+                timeout=self._timeout_ms,
+            )
+            if self._wait_for_selector is not None:
+                await page.wait_for_selector(self._wait_for_selector, timeout=self._timeout_ms)
+            if self._extra_wait_ms:
+                await page.wait_for_timeout(self._extra_wait_ms)
+            async with page.expect_download(timeout=self._timeout_ms) as download_info:
+                await page.locator(selector).click(timeout=self._timeout_ms)
+            download = await download_info.value
+            download_path = await download.path()
+            status_code = None if response is None else response.status
+            return status_code, Path(download_path).read_bytes()
+        except self._error_types as exc:
+            raise BrowserError(
+                "Browser download failed.",
+                detail=f"URL: {url}\nSelector: {selector}\n{exc}",
+            ) from exc
+        finally:
+            await page.close()
 
     async def aclose(self) -> None:
         await self._context.close()

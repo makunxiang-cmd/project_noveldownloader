@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from ndl.rules.loader import load_builtin_rules
 from ndl.rules.schema import (
+    ArchiveDownloadRule,
     BrowserRule,
     FetcherRule,
     PaginationRule,
@@ -97,6 +98,93 @@ def test_pagination_rule_rejects_mismatched_fields() -> None:
         PaginationRule(type="index-template")
     with pytest.raises(ValidationError, match=r"pagination\.template"):
         PaginationRule(type="next", next=next_selector, template="index_{page}.html")
+
+
+def test_archive_download_rule_validates_trigger_modes() -> None:
+    url_archive = ArchiveDownloadRule(
+        trigger="url-template",
+        url_template="{source_url}/download.txt",
+        encodings=["utf-8", "gb18030"],
+        strip_patterns=[r"^AD.*$"],
+    )
+    selector_archive = ArchiveDownloadRule(trigger="selector", selector="a.download")
+
+    assert url_archive.format == "txt"
+    assert url_archive.url_template == "{source_url}/download.txt"
+    assert selector_archive.selector == "a.download"
+
+
+def test_archive_download_rule_rejects_mismatched_fields() -> None:
+    with pytest.raises(ValidationError, match=r"download_archive\.url_template"):
+        ArchiveDownloadRule(trigger="url-template")
+    with pytest.raises(ValidationError, match=r"download_archive\.selector"):
+        ArchiveDownloadRule(trigger="selector")
+    with pytest.raises(ValidationError, match=r"download_archive\.selector"):
+        ArchiveDownloadRule(
+            trigger="url-template",
+            url_template="{source_url}/download.txt",
+            selector="a.download",
+        )
+    with pytest.raises(ValidationError, match=r"download_archive\.url_template"):
+        ArchiveDownloadRule(
+            trigger="selector",
+            selector="a.download",
+            url_template="{source_url}/download.txt",
+        )
+    with pytest.raises(ValidationError, match="invalid archive strip pattern"):
+        ArchiveDownloadRule(
+            trigger="url-template",
+            url_template="{source_url}/download.txt",
+            strip_patterns=["["],
+        )
+
+
+def test_source_rule_rejects_archive_selector_without_browser_fetcher() -> None:
+    base = _minimal_rule()
+    base["download_archive"] = {"trigger": "selector", "selector": "a.download"}
+
+    with pytest.raises(ValidationError, match="selector trigger requires"):
+        SourceRule.model_validate(base)
+
+
+def test_source_rule_rejects_archive_with_index_pagination() -> None:
+    base = _minimal_rule()
+    index = base["index"]
+    assert isinstance(index, dict)
+    index = dict(index)
+    index["pagination"] = {
+        "type": "next",
+        "next": {"selector": "a.next", "attr": "href", "resolve": "relative"},
+    }
+    base["index"] = index
+    base["download_archive"] = {
+        "trigger": "url-template",
+        "url_template": "{source_url}/download.txt",
+    }
+
+    with pytest.raises(ValidationError, match="cannot be combined"):
+        SourceRule.model_validate(base)
+
+
+def test_source_rule_accepts_qishuxia_style_browser_archive() -> None:
+    base = _minimal_rule()
+    fetcher = base["fetcher"]
+    assert isinstance(fetcher, dict)
+    fetcher = dict(fetcher)
+    fetcher["type"] = "browser"
+    base["fetcher"] = fetcher
+    base["download_archive"] = {
+        "format": "txt",
+        "trigger": "selector",
+        "selector": "a[href*='txtarticle.php']",
+        "encodings": ["utf-8-sig", "gb18030", "gbk"],
+        "strip_patterns": ["^\\u6700\\u65b0\\u7f51\\u5740\\uff1a?.*$"],
+    }
+
+    rule = SourceRule.model_validate(base)
+
+    assert rule.download_archive is not None
+    assert rule.download_archive.selector == "a[href*='txtarticle.php']"
 
 
 def test_source_rule_rejects_invalid_regex() -> None:
