@@ -36,6 +36,10 @@ uv run ndl convert book.txt -o book.epub
 uv run ndl convert book.txt -o book.txt --format txt
 ```
 
+EPUB output includes a stylesheet, title page, chapter page breaks, justified
+paragraph styling, and an embedded cover when the `Novel` has `cover_data` or a
+reachable `cover_url`.
+
 ### Download a rule-matched source
 
 ```bash

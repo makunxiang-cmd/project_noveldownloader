@@ -13,7 +13,7 @@ repeatable wheel/sdist verification. Agent handoff state is tracked in
 ## Current Capabilities
 
 - `ndl rules validate <rule.yaml>` validates YAML source rules.
-- `ndl convert book.txt -o book.epub` converts local TXT input to TXT or EPUB.
+- `ndl convert book.txt -o book.epub` converts local TXT input to styled EPUB or TXT.
 - `ndl download <url> -o book.epub --accept-disclaimer` downloads a rule-matched static HTML source, writes TXT or EPUB, and saves to the local SQLite library by default (`--no-save` to skip).
 - `ndl library list/show/remove` inspects and prunes the local SQLite library.
 - `ndl update --all --accept-disclaimer` refreshes saved non-completed novels and appends newly discovered chapters.
