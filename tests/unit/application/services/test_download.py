@@ -10,8 +10,8 @@ import pytest
 from ndl.application.services import DownloadService
 from ndl.core.progress import ProgressEvent
 from ndl.parsers import HtmlParser
-from ndl.rules.loader import load_builtin_rules
 from ndl.rules.schema import ArchiveDownloadRule, PaginationRule, Selector, SourceRule
+from tests.rule_fixtures import load_example_static_rule
 
 BASE_URL = "https://example-novels.test/book/123"
 FIXTURE_DIR = Path(__file__).parents[3] / "contract" / "fixtures" / "example_static"
@@ -63,7 +63,7 @@ class FakeFetcher:
 
 @pytest.mark.asyncio
 async def test_download_service_fetches_index_and_chapters_with_progress() -> None:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    rule = load_example_static_rule()
     chapter_one = (FIXTURE_DIR / "chapter.html").read_text(encoding="utf-8")
     chapter_two = chapter_one.replace("Chapter 1: Dawn", "Chapter 2: Noon").replace(
         "Morning arrived over the quiet archive.",
@@ -105,7 +105,7 @@ async def test_download_service_fetches_index_and_chapters_with_progress() -> No
 
 @pytest.mark.asyncio
 async def test_download_service_fetches_chapters_concurrently() -> None:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    rule = load_example_static_rule()
     chapter_one = (FIXTURE_DIR / "chapter.html").read_text(encoding="utf-8")
     chapter_two = chapter_one.replace("Chapter 1: Dawn", "Chapter 2: Noon").replace(
         "Morning arrived over the quiet archive.",
@@ -363,7 +363,7 @@ def _example_rule(
     archive: ArchiveDownloadRule | None = None,
     fetcher_type: str | None = None,
 ) -> SourceRule:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    rule = load_example_static_rule()
     index = rule.index
     chapter = rule.chapter
     fetcher = rule.fetcher

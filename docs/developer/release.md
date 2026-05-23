@@ -41,7 +41,6 @@ uv build --wheel --sdist --out-dir dist
 
 Inspect the wheel before upload. It must include:
 
-- `ndl/builtin_rules/example_static.yaml`
 - `ndl/web/templates/*.html`
 - `ndl/web/static/css/app.css`
 - `ndl/web/static/js/app.js`
@@ -72,7 +71,7 @@ python -m venv /tmp/ndl-smoke
 /tmp/ndl-smoke/bin/pip install --upgrade pip
 /tmp/ndl-smoke/bin/pip install dist/ndl_storykit-*.whl
 
-# Run the smoke (validates --version, rules list, rules validate, doctor browser diagnostic)
+# Run the smoke (validates --version, empty fresh rules list, local rule validation, doctor browser diagnostic)
 /tmp/ndl-smoke/bin/python scripts/smoke_cli.py --ndl /tmp/ndl-smoke/bin/ndl
 ```
 

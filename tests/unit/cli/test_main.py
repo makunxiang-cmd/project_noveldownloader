@@ -19,6 +19,7 @@ from ndl.application.container import ServiceContainer
 from ndl.cli.main import _run_web_server, app
 from ndl.core.models import Chapter, Novel
 from ndl.fetchers import BrowserRuntimeDiagnostic
+from tests.rule_fixtures import EXAMPLE_STATIC_RULE_PATH
 
 runner = CliRunner()
 BASE_URL = "https://example-novels.test/book/123"
@@ -140,17 +141,25 @@ def test_convert_command_writes_epub_from_txt(tmp_path) -> None:
         assert "OEBPS/Text/chapter_0001.xhtml" in archive.namelist()
 
 
-def test_rules_list_command_lists_loaded_rules(tmp_path: Path) -> None:
+def test_rules_list_command_reports_empty_fresh_install(tmp_path: Path) -> None:
     result = runner.invoke(app, ["rules", "list"], env={"NDL_HOME": str(tmp_path / "ndl-home")})
+
+    assert result.exit_code == 0, result.output
+    assert "No rules loaded." in result.output
+
+
+def test_rules_list_command_lists_user_rules(tmp_path: Path) -> None:
+    ndl_home = tmp_path / "ndl-home"
+    _install_example_rule(ndl_home)
+
+    result = runner.invoke(app, ["rules", "list"], env={"NDL_HOME": str(ndl_home)})
 
     assert result.exit_code == 0, result.output
     assert "example_static" in result.output
 
 
-def test_rules_validate_command_accepts_builtin_rule() -> None:
-    rule_path = REPO_ROOT / "src" / "ndl" / "builtin_rules" / "example_static.yaml"
-
-    result = runner.invoke(app, ["rules", "validate", str(rule_path)])
+def test_rules_validate_command_accepts_fixture_rule() -> None:
+    result = runner.invoke(app, ["rules", "validate", str(EXAMPLE_STATIC_RULE_PATH)])
 
     assert result.exit_code == 0, result.output
     assert "Rule valid: example_static" in result.output
@@ -376,10 +385,12 @@ def test_run_web_server_uses_serve_factory_and_scheduler_env(
 
 
 @respx.mock
-def test_search_command_renders_mocked_results() -> None:
+def test_search_command_renders_mocked_results(tmp_path: Path) -> None:
+    ndl_home = tmp_path / "ndl-home"
+    _install_example_rule(ndl_home)
     _mock_example_search("west", SEARCH_HTML)
 
-    result = runner.invoke(app, ["search", "west"])
+    result = runner.invoke(app, ["search", "west"], env={"NDL_HOME": str(ndl_home)})
 
     assert result.exit_code == 0, result.output
     assert "Public Domain Static Site Example" in result.output
@@ -389,12 +400,15 @@ def test_search_command_renders_mocked_results() -> None:
 
 
 @respx.mock
-def test_search_command_supports_rule_filter_and_limit() -> None:
+def test_search_command_supports_rule_filter_and_limit(tmp_path: Path) -> None:
+    ndl_home = tmp_path / "ndl-home"
+    _install_example_rule(ndl_home)
     _mock_example_search("west", SEARCH_HTML)
 
     result = runner.invoke(
         app,
         ["search", "west", "--rule", "example_static", "--limit", "1"],
+        env={"NDL_HOME": str(ndl_home)},
     )
 
     assert result.exit_code == 0, result.output
@@ -403,10 +417,12 @@ def test_search_command_supports_rule_filter_and_limit() -> None:
 
 
 @respx.mock
-def test_search_command_prints_empty_state() -> None:
+def test_search_command_prints_empty_state(tmp_path: Path) -> None:
+    ndl_home = tmp_path / "ndl-home"
+    _install_example_rule(ndl_home)
     _mock_example_search("nothing", EMPTY_SEARCH_HTML)
 
-    result = runner.invoke(app, ["search", "nothing"])
+    result = runner.invoke(app, ["search", "nothing"], env={"NDL_HOME": str(ndl_home)})
 
     assert result.exit_code == 0, result.output
     assert "No search results." in result.output
@@ -419,8 +435,15 @@ def test_search_command_rejects_empty_keyword() -> None:
     assert "Search keyword cannot be empty." in result.output
 
 
-def test_search_command_rejects_unsupported_rule_id() -> None:
-    result = runner.invoke(app, ["search", "west", "--rule", "missing"])
+def test_search_command_rejects_unsupported_rule_id(tmp_path: Path) -> None:
+    ndl_home = tmp_path / "ndl-home"
+    _install_example_rule(ndl_home)
+
+    result = runner.invoke(
+        app,
+        ["search", "west", "--rule", "missing"],
+        env={"NDL_HOME": str(ndl_home)},
+    )
 
     assert result.exit_code == 2
     assert "Unsupported search rule selection." in result.output
@@ -443,6 +466,7 @@ def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_download_command_writes_epub_against_mocked_http(tmp_path) -> None:
     output_path = tmp_path / "downloaded.epub"
     ndl_home = tmp_path / "ndl-home"
+    _install_example_rule(ndl_home)
     _mock_example_download()
 
     result = runner.invoke(
@@ -469,6 +493,7 @@ def test_download_command_writes_epub_against_mocked_http(tmp_path) -> None:
 def test_download_no_save_skips_library(tmp_path) -> None:
     output_path = tmp_path / "downloaded.epub"
     ndl_home = tmp_path / "ndl-home"
+    _install_example_rule(ndl_home)
     _mock_example_download()
 
     result = runner.invoke(
@@ -489,6 +514,7 @@ def test_download_no_save_skips_library(tmp_path) -> None:
 @respx.mock
 def test_update_all_appends_new_chapters_against_mocked_http(tmp_path: Path) -> None:
     ndl_home = tmp_path / "ndl-home"
+    _install_example_rule(ndl_home)
     novel_id = _seed_updatable_library(ndl_home)
     _mock_example_update()
 
@@ -604,6 +630,15 @@ rules:
     )
     respx.get(REMOTE_RULE_URL).mock(
         return_value=httpx.Response(200, text=textwrap.dedent(rule_yaml))
+    )
+
+
+def _install_example_rule(ndl_home: Path) -> None:
+    rules_dir = ndl_home / "rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "example_static.yaml").write_text(
+        EXAMPLE_STATIC_RULE_PATH.read_text(encoding="utf-8"),
+        encoding="utf-8",
     )
 
 

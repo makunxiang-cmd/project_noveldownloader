@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
+from tests.rule_fixtures import load_example_static_rule
 
-from ndl.rules.loader import load_builtin_rules
 from ndl.rules.schema import (
     ArchiveDownloadRule,
     BrowserRule,
@@ -21,8 +21,8 @@ from ndl.rules.schema import (
 )
 
 
-def test_builtin_example_rule_loads_and_matches_url() -> None:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+def test_example_rule_fixture_loads_and_matches_url() -> None:
+    rule = load_example_static_rule()
 
     assert rule.matches("https://example-novels.test/book/123")
     assert not rule.matches("https://other.test/book/123")

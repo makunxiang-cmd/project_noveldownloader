@@ -21,7 +21,7 @@ repeatable wheel/sdist verification. Agent handoff state is tracked in
 - `ndl rules update --manifest-url <url>` fetches a remote manifest, validates every downloaded YAML rule, shows a summary, and writes to `<NDL_HOME>/rules` only after confirmation.
 - `ndl doctor browser` checks the optional Playwright/Chromium runtime for browser-backed rules.
 - `ndl serve --accept-disclaimer` starts the local FastAPI/Jinja2 Web UI on `127.0.0.1`, supports search, Web-triggered downloads, manual update-all, and recurring updates by default.
-- Downloads honor the bundled rule's robots.txt, rate-limit, retry, and encoding policies.
+- Downloads honor each matched rule's robots.txt, rate-limit, retry, and encoding policies.
 - Rules may opt into optional Playwright rendering with `fetcher.type: browser`
   when installed with `ndl-storykit[browser]`, including declarative
   wait/viewport controls.

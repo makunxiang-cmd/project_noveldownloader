@@ -81,7 +81,7 @@ If you later add CI as a required check under `main` branch protection, switch t
 - `src/ndl/cli/`: Typer command surface and disclaimer gate
 - `src/ndl/web/`: FastAPI app factory, Jinja2 templates, hand-written CSS, native EventSource JS, and the in-memory job registry
 - `tests/unit/`: mirrors source package structure
-- `tests/contract/`: bundled rule fixtures and contract tests
+- `tests/contract/`: test-only rule fixtures and contract tests
 
 ## Implementation Style
 

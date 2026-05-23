@@ -7,7 +7,13 @@ import textwrap
 import pytest
 
 from ndl.core.errors import RuleNotFoundError, RuleValidationError
-from ndl.rules.loader import RuleLoadSource, load_default_rules, load_rule_file, load_rules
+from ndl.rules.loader import (
+    RuleLoadSource,
+    load_builtin_rules,
+    load_default_rules,
+    load_rule_file,
+    load_rules,
+)
 from ndl.rules.resolver import RuleResolver
 
 RULE_YAML = """
@@ -50,6 +56,12 @@ def test_load_rule_file_wraps_schema_errors(tmp_path) -> None:
 
     with pytest.raises(RuleValidationError):
         load_rule_file(path)
+
+
+def test_load_builtin_rules_does_not_include_example_static() -> None:
+    rules = load_builtin_rules()
+
+    assert rules == []
 
 
 def test_load_rules_higher_source_priority_overrides_same_id(tmp_path) -> None:

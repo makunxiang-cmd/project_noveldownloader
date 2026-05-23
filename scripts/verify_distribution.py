@@ -11,7 +11,6 @@ from email.parser import Parser
 from pathlib import Path
 
 REQUIRED_WHEEL_MEMBERS = {
-    "ndl/builtin_rules/example_static.yaml",
     "ndl/web/static/css/app.css",
     "ndl/web/static/js/app.js",
     "ndl/web/templates/base.html",
@@ -24,7 +23,6 @@ REQUIRED_WHEEL_MEMBERS = {
 }
 REQUIRED_SDIST_SUFFIXES = {
     "pyproject.toml",
-    "src/ndl/builtin_rules/example_static.yaml",
     "src/ndl/web/static/css/app.css",
     "src/ndl/web/static/js/app.js",
     "src/ndl/web/templates/base.html",

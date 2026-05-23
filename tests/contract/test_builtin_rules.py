@@ -1,19 +1,20 @@
-"""Contract tests for bundled rules against fixed HTML fixtures."""
+"""Contract tests for rule fixtures against fixed HTML fixtures."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+from tests.rule_fixtures import load_example_static_rule
+
 from ndl.parsers import HtmlParser
-from ndl.rules.loader import load_builtin_rules
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures"
 BASE_URL = "https://example-novels.test/book/123"
 
 
 def test_example_static_rule_contract() -> None:
-    rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
+    rule = load_example_static_rule()
     fixture_dir = FIXTURE_ROOT / rule.id
     expected = json.loads((fixture_dir / "expected.json").read_text(encoding="utf-8"))
     parser = HtmlParser(rule)

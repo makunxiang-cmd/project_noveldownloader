@@ -17,6 +17,7 @@ from ndl.application.container import ServiceContainer
 from ndl.core.errors import BrowserError
 from ndl.core.models import Chapter, Novel
 from ndl.web import create_app
+from tests.rule_fixtures import load_example_static_rule
 
 BASE_URL = "https://example-novels.test/book/123"
 REPO_ROOT = Path(__file__).parents[3]
@@ -63,6 +64,8 @@ def make_container() -> Iterator[ContainerFactory]:
     created: list[ServiceContainer] = []
 
     def factory(**kwargs: Any) -> ServiceContainer:
+        if "rules" not in kwargs:
+            kwargs["rules"] = [load_example_static_rule()]
         container = ServiceContainer(**kwargs)
         created.append(container)
         return container
