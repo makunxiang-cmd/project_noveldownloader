@@ -6,7 +6,15 @@ import pytest
 from pydantic import ValidationError
 
 from ndl.rules.loader import load_builtin_rules
-from ndl.rules.schema import BrowserRule, FetcherRule, RateLimitRule, RobotsRule, SourceRule
+from ndl.rules.schema import (
+    BrowserRule,
+    FetcherRule,
+    PaginationRule,
+    RateLimitRule,
+    RobotsRule,
+    Selector,
+    SourceRule,
+)
 
 
 def test_builtin_example_rule_loads_and_matches_url() -> None:
@@ -58,6 +66,37 @@ def test_browser_rule_rejects_invalid_runtime_controls() -> None:
         BrowserRule(navigation_timeout_ms=999)
     with pytest.raises(ValidationError):
         BrowserRule(viewport={"width": 100, "height": 900})
+
+
+def test_pagination_rule_validates_supported_modes() -> None:
+    next_selector = Selector(selector="a.next", attr="href", resolve="relative")
+
+    assert PaginationRule().type == "none"
+    assert PaginationRule(type="next", next=next_selector).next == next_selector
+
+    template = PaginationRule(
+        type="index-template",
+        template="{source_url}index_{page}.html",
+        start=2,
+        max_pages=20,
+    )
+
+    assert template.template == "{source_url}index_{page}.html"
+    assert template.start == 2
+    assert template.max_pages == 20
+
+
+def test_pagination_rule_rejects_mismatched_fields() -> None:
+    next_selector = Selector(selector="a.next", attr="href")
+
+    with pytest.raises(ValidationError, match=r"pagination\.next"):
+        PaginationRule(type="next")
+    with pytest.raises(ValidationError, match=r"pagination\.next"):
+        PaginationRule(type="none", next=next_selector)
+    with pytest.raises(ValidationError, match=r"pagination\.template"):
+        PaginationRule(type="index-template")
+    with pytest.raises(ValidationError, match=r"pagination\.template"):
+        PaginationRule(type="next", next=next_selector, template="index_{page}.html")
 
 
 def test_source_rule_rejects_invalid_regex() -> None:

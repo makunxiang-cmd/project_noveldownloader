@@ -13,7 +13,7 @@ FetcherType = Literal["http", "browser"]
 BackoffType = Literal["fixed", "exponential"]
 EncodingName = Literal["utf-8", "gbk", "gb18030", "auto"]
 BrowserWaitUntil = Literal["commit", "domcontentloaded", "load", "networkidle"]
-PaginationType = Literal["none", "next"]
+PaginationType = Literal["none", "next", "index-template"]
 SelectorAttr = Literal["text", "html", "href", "src"]
 ResolveMode = Literal["none", "relative"]
 
@@ -176,12 +176,25 @@ class PaginationRule(StrictModel):
 
     type: PaginationType = "none"
     next: Selector | None = None
+    template: str | None = None
+    start: int = Field(default=2, ge=1)
+    max_pages: int = Field(default=50, ge=1, le=500)
     terminator: str | None = None
 
     @model_validator(mode="after")
-    def _next_required_for_next_pagination(self) -> PaginationRule:
+    def _required_fields_match_pagination_type(self) -> PaginationRule:
         if self.type == "next" and self.next is None:
             raise ValueError("pagination.next is required when pagination.type is 'next'")
+        if self.type != "next" and self.next is not None:
+            raise ValueError("pagination.next is only valid when pagination.type is 'next'")
+        if self.type == "index-template" and self.template is None:
+            raise ValueError(
+                "pagination.template is required when pagination.type is 'index-template'"
+            )
+        if self.type != "index-template" and self.template is not None:
+            raise ValueError(
+                "pagination.template is only valid when pagination.type is 'index-template'"
+            )
         return self
 
 
