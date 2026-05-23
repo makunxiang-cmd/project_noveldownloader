@@ -177,14 +177,14 @@ async def _playwright_session(
     except (PlaywrightError, PlaywrightTimeoutError) as exc:
         await _safe_aclose(context)
         await _safe_aclose(browser)
-        await _safe_stop_manager(manager)
+        await _safe_stop_playwright(playwright)
         raise BrowserError(
             "Browser runtime failed to start.",
             detail=f"Rule: {rule.id}\n{exc}\n\n{_BROWSER_INSTALL_DETAIL}",
         ) from exc
 
     return _PlaywrightBrowserSession(
-        manager=manager,
+        playwright=playwright,
         browser=browser,
         context=context,
         timeout_ms=timeout * 1000,
@@ -199,7 +199,7 @@ class _PlaywrightBrowserSession:
     def __init__(
         self,
         *,
-        manager: Any,
+        playwright: Any,
         browser: Any,
         context: Any,
         timeout_ms: float,
@@ -208,7 +208,7 @@ class _PlaywrightBrowserSession:
         extra_wait_ms: int,
         error_types: tuple[type[Exception], ...],
     ) -> None:
-        self._manager = manager
+        self._playwright = playwright
         self._browser = browser
         self._context = context
         self._timeout_ms = timeout_ms
@@ -243,7 +243,7 @@ class _PlaywrightBrowserSession:
     async def aclose(self) -> None:
         await self._context.close()
         await self._browser.close()
-        await self._manager.stop()
+        await self._playwright.stop()
 
 
 async def check_browser_runtime() -> BrowserRuntimeDiagnostic:
@@ -273,7 +273,7 @@ async def check_browser_runtime() -> BrowserRuntimeDiagnostic:
         )
     finally:
         await _safe_aclose(browser)
-        await _safe_stop_manager(manager)
+        await _safe_stop_playwright(playwright)
 
     return BrowserRuntimeDiagnostic(ok=True, message="Playwright Chromium is available.")
 
@@ -285,6 +285,8 @@ async def _safe_aclose(resource: Any | None) -> None:
         await resource.close()
 
 
-async def _safe_stop_manager(manager: Any) -> None:
+async def _safe_stop_playwright(playwright: Any | None) -> None:
+    if playwright is None:
+        return
     with contextlib.suppress(Exception):
-        await manager.stop()
+        await playwright.stop()
