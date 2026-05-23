@@ -30,11 +30,21 @@ _CHAPTER_HEADING_RE = re.compile(
     re.IGNORECASE,
 )
 _MARKDOWN_HEADING_RE = re.compile(r"^#{2,6}\s+(?P<title>.+)$")
+_TITLE_LABELS = (
+    f"书名{_FULLWIDTH_COLON}",
+    "书名:",
+    f"标题{_FULLWIDTH_COLON}",
+    "标题:",
+    f"Title{_FULLWIDTH_COLON}",
+    "Title:",
+    f"title{_FULLWIDTH_COLON}",
+    "title:",
+)
 _AUTHOR_LABELS = (f"作者{_FULLWIDTH_COLON}", "作者:")
 _SOURCE_LABELS = (f"来源{_FULLWIDTH_COLON}", "来源:")
 _RULE_LABELS = (f"规则{_FULLWIDTH_COLON}", "规则:")
 _STATUS_LABELS = (f"状态{_FULLWIDTH_COLON}", "状态:")
-_METADATA_LABELS = _AUTHOR_LABELS + _SOURCE_LABELS + _RULE_LABELS + _STATUS_LABELS
+_METADATA_LABELS = _TITLE_LABELS + _AUTHOR_LABELS + _SOURCE_LABELS + _RULE_LABELS + _STATUS_LABELS
 _SUMMARY_LABELS = (f"简介{_FULLWIDTH_COLON}", "简介:", "Summary:")
 _BODY_MARKERS = ("正文", "Content:")
 
@@ -127,7 +137,7 @@ def _chapter_title(line: str) -> str | None:
 def _parse_metadata(lines: list[str], source_path: Path) -> _TxtMetadata:
     title = source_path.stem
     author = "unknown"
-    source_url: str | None = None
+    source_url: str | None = f"file://{source_path.resolve()}"
     source_rule_id = "txt"
     summary = _summary_from(lines)
     title_set = False
@@ -138,6 +148,9 @@ def _parse_metadata(lines: list[str], source_path: Path) -> _TxtMetadata:
             continue
         if stripped.startswith("# ") and not stripped.startswith("## "):
             title = stripped[2:].strip()
+            title_set = True
+        elif stripped.startswith(_TITLE_LABELS):
+            title = _after_label(stripped) or title
             title_set = True
         elif stripped.startswith(_AUTHOR_LABELS):
             author = _after_label(stripped)
