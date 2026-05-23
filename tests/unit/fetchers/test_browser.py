@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import builtins
+import sys
 import textwrap
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import httpx
@@ -123,6 +125,27 @@ class FakeClosable:
 
     async def stop(self) -> None:
         self.closed = True
+
+
+class FakePlaywrightError(Exception):
+    pass
+
+
+class FakePlaywrightTimeoutError(FakePlaywrightError):
+    pass
+
+
+def install_fake_playwright(
+    monkeypatch: pytest.MonkeyPatch,
+    async_playwright: Any,
+) -> None:
+    playwright_module = ModuleType("playwright")
+    async_api_module = ModuleType("playwright.async_api")
+    async_api_module.Error = FakePlaywrightError
+    async_api_module.TimeoutError = FakePlaywrightTimeoutError
+    async_api_module.async_playwright = async_playwright
+    monkeypatch.setitem(sys.modules, "playwright", playwright_module)
+    monkeypatch.setitem(sys.modules, "playwright.async_api", async_api_module)
 
 
 @pytest.fixture
@@ -244,9 +267,9 @@ async def test_playwright_session_uses_rule_browser_wait_controls() -> None:
     page = FakePlaywrightPage()
     context = FakePlaywrightContext(page)
     browser = FakeClosable()
-    manager = FakeClosable()
+    playwright = FakeClosable()
     session = _PlaywrightBrowserSession(
-        manager=manager,
+        playwright=playwright,
         browser=browser,
         context=context,
         timeout_ms=15000,
@@ -273,7 +296,98 @@ async def test_playwright_session_uses_rule_browser_wait_controls() -> None:
     assert page.closed is True
     assert context.closed is True
     assert browser.closed is True
-    assert manager.closed is True
+    assert playwright.closed is True
+
+
+@pytest.mark.asyncio
+async def test_playwright_session_closes_started_playwright_not_manager(
+    rule: SourceRule,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = FakePlaywrightPage()
+    context = FakePlaywrightContext(page)
+
+    class FakeBrowser(FakeClosable):
+        async def new_context(self, **_kwargs: object) -> FakePlaywrightContext:
+            return context
+
+    class FakeChromium:
+        def __init__(self, browser: FakeBrowser) -> None:
+            self.browser = browser
+
+        async def launch(self, *, headless: bool) -> FakeBrowser:
+            assert headless is True
+            return self.browser
+
+    class FakeStartedPlaywright:
+        def __init__(self, browser: FakeBrowser) -> None:
+            self.chromium = FakeChromium(browser)
+            self.stopped = False
+
+        async def stop(self) -> None:
+            self.stopped = True
+
+    class FakeManager:
+        def __init__(self, playwright: FakeStartedPlaywright) -> None:
+            self.playwright = playwright
+            self.started = False
+
+        async def start(self) -> FakeStartedPlaywright:
+            self.started = True
+            return self.playwright
+
+    browser = FakeBrowser()
+    playwright = FakeStartedPlaywright(browser)
+    manager = FakeManager(playwright)
+    install_fake_playwright(monkeypatch, lambda: manager)
+
+    session = await _playwright_session(rule, {"User-Agent": "ndl-test"}, 30.0)
+    status, html = await session.get_html("https://site.test/page")
+    await session.aclose()
+
+    assert status == 200
+    assert html == "<html>ready</html>"
+    assert manager.started is True
+    assert not hasattr(manager, "stop")
+    assert page.closed is True
+    assert context.closed is True
+    assert browser.closed is True
+    assert playwright.stopped is True
+
+
+@pytest.mark.asyncio
+async def test_playwright_session_failure_stops_started_playwright(
+    rule: SourceRule,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeChromium:
+        async def launch(self, *, headless: bool) -> object:
+            assert headless is True
+            raise FakePlaywrightError("launch failed")
+
+    class FakeStartedPlaywright:
+        def __init__(self) -> None:
+            self.chromium = FakeChromium()
+            self.stopped = False
+
+        async def stop(self) -> None:
+            self.stopped = True
+
+    class FakeManager:
+        def __init__(self, playwright: FakeStartedPlaywright) -> None:
+            self.playwright = playwright
+
+        async def start(self) -> FakeStartedPlaywright:
+            return self.playwright
+
+    playwright = FakeStartedPlaywright()
+    install_fake_playwright(monkeypatch, lambda: FakeManager(playwright))
+
+    with pytest.raises(BrowserError) as info:
+        await _playwright_session(rule, {"User-Agent": "ndl-test"}, 30.0)
+
+    assert "Browser runtime failed to start." in info.value.user_message()
+    assert playwright.stopped is True
 
 
 @pytest.mark.asyncio
@@ -325,7 +439,7 @@ async def test_default_session_factory_reports_missing_playwright(
 
 @pytest.mark.asyncio
 async def test_safe_close_swallows_errors() -> None:
-    from ndl.fetchers.browser import _safe_aclose, _safe_stop_manager
+    from ndl.fetchers.browser import _safe_aclose, _safe_stop_playwright
 
     class Boom:
         async def close(self) -> None:
@@ -336,7 +450,8 @@ async def test_safe_close_swallows_errors() -> None:
 
     await _safe_aclose(None)
     await _safe_aclose(Boom())
-    await _safe_stop_manager(Boom())
+    await _safe_stop_playwright(None)
+    await _safe_stop_playwright(Boom())
 
 
 @pytest.mark.asyncio
@@ -359,3 +474,41 @@ async def test_browser_runtime_check_reports_missing_playwright(
     assert diagnostic.detail is not None
     assert "uv sync --extra browser" in diagnostic.detail
     assert "playwright install chromium" in diagnostic.detail
+
+
+@pytest.mark.asyncio
+async def test_browser_runtime_check_stops_started_playwright(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeChromium:
+        def __init__(self, browser: FakeClosable) -> None:
+            self.browser = browser
+
+        async def launch(self, *, headless: bool) -> FakeClosable:
+            assert headless is True
+            return self.browser
+
+    class FakeStartedPlaywright:
+        def __init__(self, browser: FakeClosable) -> None:
+            self.chromium = FakeChromium(browser)
+            self.stopped = False
+
+        async def stop(self) -> None:
+            self.stopped = True
+
+    class FakeManager:
+        def __init__(self, playwright: FakeStartedPlaywright) -> None:
+            self.playwright = playwright
+
+        async def start(self) -> FakeStartedPlaywright:
+            return self.playwright
+
+    browser = FakeClosable()
+    playwright = FakeStartedPlaywright(browser)
+    install_fake_playwright(monkeypatch, lambda: FakeManager(playwright))
+
+    diagnostic = await check_browser_runtime()
+
+    assert diagnostic.ok is True
+    assert browser.closed is True
+    assert playwright.stopped is True

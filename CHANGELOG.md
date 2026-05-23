@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `0.2.0.dev0` development cycle instead of the earlier P7 release-candidate
   state.
 
+### Fixed
+
+- Browser-backed fetches now stop the started Playwright runtime instead of
+  calling `stop()` on the `async_playwright()` context manager, fixing shutdown
+  crashes and cleanup leaks on normal fetches, startup failures, and
+  `ndl doctor browser` runtime checks.
+
 ## [0.1.0] - 2026-05-13
 
 ### Changed
