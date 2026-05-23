@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import cast, get_args
 
-from selectolax.parser import HTMLParser
+from selectolax.parser import HTMLParser, Node
 
 from ndl.core.errors import SelectorNotFoundError
 from ndl.core.models import ChapterStub, Novel, NovelStatus
@@ -26,15 +26,13 @@ def parse_index(rule: SourceRule, html: str, *, source_url: str) -> tuple[Novel,
     cover_url = _maybe_text(novel_meta.cover, root, source_url)
     status = _coerce_status(_maybe_text(novel_meta.status, root, source_url))
 
-    container_selector = rule.index.chapter_list.container
-    container = root.css_first(container_selector)
-    if container is None:
-        raise SelectorNotFoundError(container_selector)
+    chapter_list = rule.index.chapter_list
+    container = _select_chapter_container(root, rule)
 
     stubs: list[ChapterStub] = []
-    for index, item in enumerate(container.css(rule.index.chapter_list.items)):
-        stub_title = extract_text(rule.index.chapter_list.title, item, base_url=source_url)
-        stub_url = extract_text(rule.index.chapter_list.url, item, base_url=source_url)
+    for index, item in enumerate(container.css(chapter_list.items)):
+        stub_title = extract_text(chapter_list.title, item, base_url=source_url)
+        stub_url = extract_text(chapter_list.url, item, base_url=source_url)
         stubs.append(ChapterStub(index=index, title=stub_title, url=stub_url))
 
     novel = Novel(
@@ -48,6 +46,20 @@ def parse_index(rule: SourceRule, html: str, *, source_url: str) -> tuple[Novel,
         fetched_at=datetime.now(timezone.utc),
     )
     return novel, stubs
+
+
+def _select_chapter_container(root: HTMLParser, rule: SourceRule) -> Node:
+    chapter_list = rule.index.chapter_list
+    containers = root.css(chapter_list.container)
+    if not containers:
+        raise SelectorNotFoundError(chapter_list.container)
+    match chapter_list.pick:
+        case "first":
+            return containers[0]
+        case "last":
+            return containers[-1]
+        case "largest":
+            return max(containers, key=lambda node: len(node.css(chapter_list.items)))
 
 
 def _maybe_text(selector: Selector | None, root: HTMLParser, source_url: str) -> str | None:
