@@ -2,9 +2,12 @@
 
 ## Current Status
 
-P0 through P7 are implemented, v0.1.0 is published on GitHub Releases and PyPI
-as `ndl-storykit`, and the active source tree is back on `0.2.0.dev0` for the
-next development cycle. The project now has:
+P0 through P7 are implemented; v0.1.0 and v0.2.0 have both shipped on GitHub
+Releases and PyPI as `ndl-storykit`. v0.2.0 collapsed the 11 downstream-driven
+tracks from `docs/agents/downstream-feedback/2026-05-23-ndl-desktop.md` (browser
+lifecycle, pagination, archive download, POST/browser search, update alignment,
+TXT import QoL, container pick, styled EPUB, schema docs, packaging hygiene).
+The active source tree is back on `0.3.0.dev0` for the next development cycle. The project now has:
 
 - Core domain models, protocols, progress events, and typed errors
 - YAML rule schema, selector DSL, loader, and resolver

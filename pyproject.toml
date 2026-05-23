@@ -1,6 +1,6 @@
 [project]
 name = "ndl-storykit"
-version = "0.2.0"
+version = "0.3.0.dev0"
 description = "NOVELDOWNLOADER: rule-driven Chinese novel downloader and format converter"
 readme = "README.md"
 license = { text = "MIT" }

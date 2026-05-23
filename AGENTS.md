@@ -16,9 +16,10 @@ entry point remains `ndl`.
 All P7 slices are implemented. `docs/superpowers/plans/2026-05-13-ndl-p7-release-candidate.md` records P7.1 distribution verifier, P7.2 release notes draft (`docs/release-notes/v0.1.md`), P7.3 install smoke strategy (`scripts/smoke_cli.py` + `docs/developer/release.md` + `tests/unit/scripts/test_smoke_cli.py`), and P7.4 release execution gate (`docs/developer/release.md` "Execution Gate" section + 11-step Maintainer Runbook). The completed P6 plan remains at `docs/superpowers/plans/2026-05-13-ndl-p6-browser-release.md`.
 
 The current active plan is **`docs/superpowers/plans/2026-05-13-ndl-release-prep.md`**
-(Phases A-E from release candidate to published v0.1.0). Phase A, Phase B,
-and the immediate Phase C release housekeeping are complete. Current source
-checkouts are back on the next development version, `0.2.0.dev0`.
+(Phases A-E from release candidate to published v0.1.0). v0.1.0 and v0.2.0 have both shipped on PyPI; the 0.2.0 release rolled up the
+11 downstream-driven tracks tracked in
+`docs/agents/downstream-feedback/2026-05-23-ndl-desktop.md`. Current source
+checkouts are back on the next development version, `0.3.0.dev0`.
 
 For future releases, the execution gate remains hard: agents must not bump a
 release version, insert a dated CHANGELOG heading, create a release commit,
