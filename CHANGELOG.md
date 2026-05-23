@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pagination.type: next` links or `pagination.type: index-template` URL
   templates with URL de-duplication and cycle guards, and chapter pages can
   follow same-chapter `next` links to merge split chapter bodies.
+- Rules can declare `download_archive` for whole-book TXT archives. URL-template
+  archives fetch raw bytes through HTTP, browser selector archives capture a
+  Playwright download, and `DownloadService` decodes, strips, and splits the TXT
+  against index chapter titles.
 
 ### Fixed
 

@@ -4,18 +4,31 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
-from typing import cast
+import re
+from typing import Protocol, cast, runtime_checkable
 from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
 
 from ndl.application.services._progress import emit_progress
-from ndl.core.errors import SelectorNotFoundError
+from ndl.core.errors import BrowserError, FetchError, SelectorNotFoundError
 from ndl.core.models import Chapter, ChapterStub, Novel
 from ndl.core.progress import ProgressCallback
 from ndl.core.protocols import Fetcher, Parser
-from ndl.rules.schema import PaginationRule, SourceRule
+from ndl.rules.schema import ArchiveDownloadRule, PaginationRule, SourceRule
 from ndl.rules.selector import extract_selector
+
+
+@runtime_checkable
+class _ByteFetcher(Protocol):
+    async def get_bytes(self, url: str) -> bytes:
+        """Fetch raw bytes from `url`."""
+
+
+@runtime_checkable
+class _SelectorDownloadFetcher(Protocol):
+    async def get_download_bytes(self, url: str, selector: str) -> bytes:
+        """Fetch downloaded bytes triggered by clicking `selector` on `url`."""
 
 
 class DownloadService:
@@ -53,7 +66,11 @@ class DownloadService:
             done=1,
             message="Parsing index.",
         )
-        novel, stubs = await self._parse_index_pages(url, index_html)
+        rule = self._rule
+        if rule is not None and rule.download_archive is not None:
+            novel, stubs = self._parser.parse_index(index_html, source_url=url)
+        else:
+            novel, stubs = await self._parse_index_pages(url, index_html)
 
         await emit_progress(
             self._progress,
@@ -61,9 +78,23 @@ class DownloadService:
             stage="fetching_chapters",
             total=len(stubs),
             done=0,
-            message="Fetching chapters.",
+            message="Fetching archive."
+            if rule is not None and rule.download_archive
+            else "Fetching chapters.",
         )
-        chapters = await self._fetch_chapters(stubs)
+        if rule is not None and rule.download_archive is not None:
+            chapters = await self._fetch_archive_chapters(url, stubs, rule.download_archive)
+            for done, chapter in enumerate(chapters, start=1):
+                await emit_progress(
+                    self._progress,
+                    kind="chapter",
+                    stage="fetching_chapters",
+                    total=len(stubs),
+                    done=done,
+                    current_title=chapter.title,
+                )
+        else:
+            chapters = await self._fetch_chapters(stubs)
 
         completed = novel.model_copy(
             update={"chapters": sorted(chapters, key=lambda item: item.index)}
@@ -73,7 +104,7 @@ class DownloadService:
             kind="done",
             stage="fetching_chapters",
             total=len(stubs),
-            done=len(stubs),
+            done=len(chapters),
             message="Download complete.",
         )
         return completed
@@ -244,6 +275,40 @@ class DownloadService:
             published_at=first.published_at,
         )
 
+    async def _fetch_archive_chapters(
+        self,
+        source_url: str,
+        stubs: list[ChapterStub],
+        archive: ArchiveDownloadRule,
+    ) -> list[Chapter]:
+        archive_bytes = await self._fetch_archive_bytes(source_url, archive)
+        text = _decode_archive_text(archive_bytes, archive.encodings)
+        text = _strip_archive_lines(text, archive.strip_patterns)
+        return _split_archive_chapters(text, stubs)
+
+    async def _fetch_archive_bytes(
+        self,
+        source_url: str,
+        archive: ArchiveDownloadRule,
+    ) -> bytes:
+        match archive.trigger:
+            case "url-template":
+                archive_url = _format_archive_url(archive, source_url=source_url)
+                if not isinstance(self._fetcher, _ByteFetcher):
+                    raise FetchError(
+                        "Archive URL-template downloads require a byte-capable fetcher.",
+                        detail=f"URL: {archive_url}",
+                    )
+                return await self._fetcher.get_bytes(archive_url)
+            case "selector":
+                assert archive.selector is not None
+                if not isinstance(self._fetcher, _SelectorDownloadFetcher):
+                    raise BrowserError(
+                        "Archive selector downloads require a browser fetcher.",
+                        detail=f"URL: {source_url}\nSelector: {archive.selector}",
+                    )
+                return await self._fetcher.get_download_bytes(source_url, archive.selector)
+
 
 def _extend_unique_stubs(
     target: list[ChapterStub],
@@ -312,3 +377,93 @@ def _strip_page_suffix(stem: str) -> str:
 
 def _normalize_url(url: str) -> str:
     return url.strip()
+
+
+def _format_archive_url(archive: ArchiveDownloadRule, *, source_url: str) -> str:
+    assert archive.url_template is not None
+    parsed = urlparse(source_url)
+    path_parts = [part for part in parsed.path.split("/") if part]
+    source_url_path_id = path_parts[-1] if path_parts else ""
+    try:
+        archive_url = archive.url_template.format(
+            source_url=source_url,
+            source_url_path=parsed.path,
+            source_url_path_id=source_url_path_id,
+        )
+    except KeyError as exc:
+        raise FetchError(
+            "Archive URL template references an unsupported placeholder.",
+            detail=f"Placeholder: {exc.args[0]}",
+        ) from exc
+    return urljoin(source_url, archive_url)
+
+
+def _decode_archive_text(content: bytes, encodings: list[str]) -> str:
+    for encoding in encodings:
+        try:
+            return content.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return content.decode(encodings[-1], errors="replace")
+
+
+def _strip_archive_lines(text: str, strip_patterns: list[str]) -> str:
+    if not strip_patterns:
+        return text
+    patterns = [re.compile(pattern) for pattern in strip_patterns]
+    lines = [
+        line
+        for line in text.splitlines()
+        if not any(pattern.search(line.strip()) for pattern in patterns)
+    ]
+    return "\n".join(lines)
+
+
+def _split_archive_chapters(text: str, stubs: list[ChapterStub]) -> list[Chapter]:
+    if not stubs:
+        return []
+
+    chapters: list[Chapter] = []
+    current_stub: ChapterStub | None = None
+    current_lines: list[str] = []
+    search_start = 0
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        matched_index = _match_stub_title(line, stubs, search_start)
+        if matched_index is not None:
+            if current_stub is not None:
+                chapters.append(_archive_chapter(current_stub, current_lines, len(chapters)))
+            current_stub = stubs[matched_index]
+            current_lines = []
+            search_start = matched_index + 1
+            continue
+        if current_stub is not None:
+            current_lines.append(line)
+
+    if current_stub is not None:
+        chapters.append(_archive_chapter(current_stub, current_lines, len(chapters)))
+    return chapters
+
+
+def _match_stub_title(line: str, stubs: list[ChapterStub], start: int) -> int | None:
+    normalized = _normalize_title(line)
+    lookahead_end = min(len(stubs), start + 8)
+    for index in range(start, lookahead_end):
+        if normalized == _normalize_title(stubs[index].title):
+            return index
+    return None
+
+
+def _archive_chapter(stub: ChapterStub, lines: list[str], index: int) -> Chapter:
+    return Chapter(
+        index=index,
+        title=stub.title,
+        content="\n\n".join(lines),
+        source_url=stub.url,
+    )
+
+
+def _normalize_title(value: str) -> str:
+    return "".join(value.split()).casefold()

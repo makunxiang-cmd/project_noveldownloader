@@ -11,7 +11,7 @@ from ndl.application.services import DownloadService
 from ndl.core.progress import ProgressEvent
 from ndl.parsers import HtmlParser
 from ndl.rules.loader import load_builtin_rules
-from ndl.rules.schema import PaginationRule, Selector, SourceRule
+from ndl.rules.schema import ArchiveDownloadRule, PaginationRule, Selector, SourceRule
 
 BASE_URL = "https://example-novels.test/book/123"
 FIXTURE_DIR = Path(__file__).parents[3] / "contract" / "fixtures" / "example_static"
@@ -20,9 +20,20 @@ FIXTURE_DIR = Path(__file__).parents[3] / "contract" / "fixtures" / "example_sta
 class FakeFetcher:
     """Map URLs to fixture bodies for service tests."""
 
-    def __init__(self, bodies: dict[str, str], *, delay: float = 0.0) -> None:
+    def __init__(
+        self,
+        bodies: dict[str, str],
+        *,
+        bytes_bodies: dict[str, bytes] | None = None,
+        download_bodies: dict[tuple[str, str], bytes] | None = None,
+        delay: float = 0.0,
+    ) -> None:
         self.requests: list[str] = []
+        self.bytes_requests: list[str] = []
+        self.download_requests: list[tuple[str, str]] = []
         self._bodies = bodies
+        self._bytes_bodies = bytes_bodies or {}
+        self._download_bodies = download_bodies or {}
         self._delay = delay
         self.in_flight = 0
         self.peak_in_flight = 0
@@ -37,6 +48,14 @@ class FakeFetcher:
             return self._bodies[url]
         finally:
             self.in_flight -= 1
+
+    async def get_bytes(self, url: str) -> bytes:
+        self.bytes_requests.append(url)
+        return self._bytes_bodies[url]
+
+    async def get_download_bytes(self, url: str, selector: str) -> bytes:
+        self.download_requests.append((url, selector))
+        return self._download_bodies[(url, selector)]
 
     async def aclose(self) -> None:
         return None
@@ -270,19 +289,98 @@ async def test_download_service_next_paginated_chapter_without_next_link_is_noop
     assert novel.chapters[0].content == "Only page."
 
 
+@pytest.mark.asyncio
+async def test_download_service_uses_url_template_archive_and_splits_txt() -> None:
+    archive_url = f"{BASE_URL}/download.txt"
+    archive = ArchiveDownloadRule(
+        trigger="url-template",
+        url_template="{source_url}/download.txt",
+        encodings=["utf-8-sig", "gb18030"],
+        strip_patterns=[r"^AD.*$"],
+    )
+    rule = _example_rule(archive=archive)
+    chapter_one_url = f"{BASE_URL}/chapter/1"
+    chapter_two_url = f"{BASE_URL}/chapter/2"
+    archive_text = "\n".join(
+        [
+            "AD should be removed",
+            "Chapter 1: Dawn",
+            "Morning arrived.",
+            "The catalog opened.",
+            "Chapter 2: Noon",
+            "Noon light filled the room.",
+        ]
+    )
+    fetcher = FakeFetcher(
+        {
+            BASE_URL: _index_html(
+                [
+                    ("Chapter 1: Dawn", chapter_one_url),
+                    ("Chapter 2: Noon", chapter_two_url),
+                ]
+            )
+        },
+        bytes_bodies={archive_url: archive_text.encode("gb18030")},
+    )
+    service = DownloadService(fetcher=fetcher, parser=HtmlParser(rule), rule=rule)
+
+    novel = await service.download(BASE_URL)
+
+    assert fetcher.requests == [BASE_URL]
+    assert fetcher.bytes_requests == [archive_url]
+    assert [chapter.title for chapter in novel.chapters] == ["Chapter 1: Dawn", "Chapter 2: Noon"]
+    assert novel.chapters[0].content == "Morning arrived.\n\nThe catalog opened."
+    assert novel.chapters[1].content == "Noon light filled the room."
+    assert all("AD" not in chapter.content for chapter in novel.chapters)
+
+
+@pytest.mark.asyncio
+async def test_download_service_uses_browser_selector_archive() -> None:
+    archive = ArchiveDownloadRule(
+        trigger="selector",
+        selector="a.download",
+        encodings=["utf-8"],
+    )
+    rule = _example_rule(archive=archive, fetcher_type="browser")
+    chapter_one_url = f"{BASE_URL}/chapter/1"
+    fetcher = FakeFetcher(
+        {BASE_URL: _index_html([("Chapter 1: Dawn", chapter_one_url)])},
+        download_bodies={(BASE_URL, "a.download"): b"Chapter 1: Dawn\nDownloaded chapter body."},
+    )
+    service = DownloadService(fetcher=fetcher, parser=HtmlParser(rule), rule=rule)
+
+    novel = await service.download(BASE_URL)
+
+    assert fetcher.requests == [BASE_URL]
+    assert fetcher.download_requests == [(BASE_URL, "a.download")]
+    assert novel.chapters[0].content == "Downloaded chapter body."
+
+
 def _example_rule(
     *,
     index_pagination: PaginationRule | None = None,
     chapter_pagination: PaginationRule | None = None,
+    archive: ArchiveDownloadRule | None = None,
+    fetcher_type: str | None = None,
 ) -> SourceRule:
     rule = next(rule for rule in load_builtin_rules() if rule.id == "example_static")
     index = rule.index
     chapter = rule.chapter
+    fetcher = rule.fetcher
     if index_pagination is not None:
         index = index.model_copy(update={"pagination": index_pagination})
     if chapter_pagination is not None:
         chapter = chapter.model_copy(update={"pagination": chapter_pagination})
-    return rule.model_copy(update={"index": index, "chapter": chapter})
+    if fetcher_type is not None:
+        fetcher = fetcher.model_copy(update={"type": fetcher_type})
+    return rule.model_copy(
+        update={
+            "index": index,
+            "chapter": chapter,
+            "download_archive": archive,
+            "fetcher": fetcher,
+        }
+    )
 
 
 def _index_html(
