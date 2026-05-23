@@ -21,7 +21,7 @@ from ndl.fetchers.browser import (
     check_browser_runtime,
 )
 from ndl.rules.loader import load_rule_file
-from ndl.rules.schema import SourceRule
+from ndl.rules.schema import BrowserSearchRule, SourceRule
 
 RULE_YAML = """
 id: browser_test
@@ -66,11 +66,14 @@ class FakeBrowserSession:
         responses: list[tuple[int | None, str]],
         *,
         downloads: list[tuple[int | None, bytes]] | None = None,
+        searches: list[tuple[int | None, str, str]] | None = None,
     ) -> None:
         self.responses = responses
         self.download_responses = downloads or []
+        self.search_responses = searches or []
         self.urls: list[str] = []
         self.downloads: list[tuple[str, str]] = []
+        self.searches: list[tuple[BrowserSearchRule, str]] = []
         self.closed = False
 
     async def get_html(self, url: str) -> tuple[int | None, str]:
@@ -85,6 +88,16 @@ class FakeBrowserSession:
             return self.download_responses.pop(0)
         return self.download_responses[0]
 
+    async def search_html(
+        self,
+        search: BrowserSearchRule,
+        keyword: str,
+    ) -> tuple[int | None, str, str]:
+        self.searches.append((search, keyword))
+        if len(self.search_responses) > 1:
+            return self.search_responses.pop(0)
+        return self.search_responses[0]
+
     async def aclose(self) -> None:
         self.closed = True
 
@@ -97,21 +110,32 @@ class FakePlaywrightPage:
     def __init__(self, *, download_path: Path | None = None) -> None:
         self.goto_calls: list[dict[str, object]] = []
         self.wait_selectors: list[dict[str, object]] = []
+        self.wait_urls: list[dict[str, object]] = []
         self.wait_timeouts: list[int] = []
         self.download_timeouts: list[float] = []
         self.clicked_selectors: list[dict[str, object]] = []
+        self.fills: list[dict[str, object]] = []
         self._download_path = download_path
+        self.url = "about:blank"
         self.closed = False
 
     async def goto(self, url: str, *, wait_until: str, timeout: float) -> FakePlaywrightResponse:
         self.goto_calls.append({"url": url, "wait_until": wait_until, "timeout": timeout})
+        self.url = url
         return FakePlaywrightResponse()
 
     async def wait_for_selector(self, selector: str, *, timeout: float) -> None:
         self.wait_selectors.append({"selector": selector, "timeout": timeout})
 
+    async def wait_for_url(self, pattern: str, *, timeout: float) -> None:
+        self.wait_urls.append({"pattern": pattern, "timeout": timeout})
+        self.url = "https://site.test/modules/article/search.php?searchkey=west"
+
     async def wait_for_timeout(self, milliseconds: int) -> None:
         self.wait_timeouts.append(milliseconds)
+
+    async def fill(self, selector: str, value: str, *, timeout: float) -> None:
+        self.fills.append({"selector": selector, "value": value, "timeout": timeout})
 
     async def content(self) -> str:
         return "<html>ready</html>"
@@ -301,6 +325,33 @@ async def test_get_download_bytes_clicks_selector(rule: SourceRule) -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_search_html_submits_browser_search(rule: SourceRule) -> None:
+    search = BrowserSearchRule(
+        navigate_url="https://site.test/",
+        input_selector="input[name='searchkey']",
+        submit_selector=".btn-tosearch",
+        wait_for_selector="#search-results",
+    )
+    session = FakeBrowserSession(
+        [(200, "unused")],
+        searches=[(200, "<html>results</html>", "https://site.test/search?keyword=west")],
+    )
+
+    async def session_factory(
+        _source_rule: SourceRule, _headers: dict[str, str], _timeout: float
+    ) -> FakeBrowserSession:
+        return session
+
+    async with BrowserFetcher(rule, session_factory=session_factory) as fetcher:
+        html, final_url = await fetcher.get_search_html(search, "west")
+
+    assert html == "<html>results</html>"
+    assert final_url == "https://site.test/search?keyword=west"
+    assert session.searches == [(search, "west")]
+    assert session.closed is True
+
+
+@pytest.mark.asyncio
 async def test_get_uses_browser_navigation_timeout_from_rule(tmp_path: Path) -> None:
     yaml = RULE_YAML.replace(
         "  encoding: auto\n",
@@ -410,6 +461,56 @@ async def test_playwright_session_downloads_bytes_from_selector(tmp_path: Path) 
     assert page.wait_timeouts == [250]
     assert page.download_timeouts == [15000]
     assert page.clicked_selectors == [{"selector": "a.download", "timeout": 15000}]
+    assert page.closed is True
+    assert context.closed is True
+    assert browser.closed is True
+    assert playwright.closed is True
+
+
+@pytest.mark.asyncio
+async def test_playwright_session_submits_browser_search() -> None:
+    page = FakePlaywrightPage()
+    context = FakePlaywrightContext(page)
+    browser = FakeClosable()
+    playwright = FakeClosable()
+    session = _PlaywrightBrowserSession(
+        playwright=playwright,
+        browser=browser,
+        context=context,
+        timeout_ms=15000,
+        wait_until="domcontentloaded",
+        wait_for_selector="#ready",
+        extra_wait_ms=250,
+        error_types=(RuntimeError,),
+    )
+    search = BrowserSearchRule(
+        navigate_url="https://site.test/",
+        input_selector="input[name='searchkey']",
+        submit_selector=".btn-tosearch",
+        wait_for_url="**/modules/article/search.php**",
+        wait_for_selector="#search-results",
+    )
+
+    status, html, final_url = await session.search_html(search, "west")
+    await session.aclose()
+
+    assert status == 200
+    assert html == "<html>ready</html>"
+    assert final_url == "https://site.test/modules/article/search.php?searchkey=west"
+    assert page.goto_calls == [
+        {
+            "url": "https://site.test/",
+            "wait_until": "domcontentloaded",
+            "timeout": 15000,
+        }
+    ]
+    assert page.fills == [
+        {"selector": "input[name='searchkey']", "value": "west", "timeout": 15000}
+    ]
+    assert page.clicked_selectors == [{"selector": ".btn-tosearch", "timeout": 15000}]
+    assert page.wait_urls == [{"pattern": "**/modules/article/search.php**", "timeout": 15000}]
+    assert page.wait_selectors == [{"selector": "#search-results", "timeout": 15000}]
+    assert page.wait_timeouts == [250]
     assert page.closed is True
     assert context.closed is True
     assert browser.closed is True

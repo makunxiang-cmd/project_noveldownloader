@@ -9,10 +9,12 @@ from ndl.rules.loader import load_builtin_rules
 from ndl.rules.schema import (
     ArchiveDownloadRule,
     BrowserRule,
+    BrowserSearchRule,
     FetcherRule,
     PaginationRule,
     RateLimitRule,
     RobotsRule,
+    SearchRule,
     Selector,
     SourceRule,
 )
@@ -139,6 +141,90 @@ def test_archive_download_rule_rejects_mismatched_fields() -> None:
         )
 
 
+def test_search_rule_accepts_post_body() -> None:
+    rule = SearchRule(
+        method="POST",
+        url_template="https://example.test/search.html",
+        body={"s": "{keyword}"},
+        results_container=".results",
+        items="li",
+        fields={
+            "title": {"selector": "a"},
+            "url": {"selector": "a", "attr": "href", "resolve": "relative"},
+        },
+    )
+
+    assert rule.method == "POST"
+    assert rule.body == {"s": "{keyword}"}
+
+
+def test_search_rule_rejects_mismatched_body_modes() -> None:
+    fields = {
+        "title": {"selector": "a"},
+        "url": {"selector": "a", "attr": "href"},
+    }
+
+    with pytest.raises(ValidationError, match=r"search\.body"):
+        SearchRule(
+            method="GET",
+            url_template="https://example.test/search?q={keyword}",
+            body={"s": "{keyword}"},
+            results_container=".results",
+            items="li",
+            fields=fields,
+        )
+    with pytest.raises(ValidationError, match=r"search\.body"):
+        SearchRule(
+            method="POST",
+            url_template="https://example.test/search.html",
+            results_container=".results",
+            items="li",
+            fields=fields,
+        )
+
+
+def test_browser_search_rule_requires_wait_condition() -> None:
+    rule = BrowserSearchRule(
+        navigate_url="https://example.test/",
+        input_selector="input[name='searchkey']",
+        submit_selector=".btn-tosearch",
+        wait_for_url="**/modules/article/search.php**",
+    )
+
+    assert rule.wait_for_url == "**/modules/article/search.php**"
+
+    with pytest.raises(ValidationError, match="wait_for_url"):
+        BrowserSearchRule(
+            navigate_url="https://example.test/",
+            input_selector="input[name='searchkey']",
+            submit_selector=".btn-tosearch",
+        )
+
+
+def test_source_rule_rejects_browser_search_without_browser_fetcher() -> None:
+    base = _minimal_rule()
+    base["search"] = _browser_search_block()
+
+    with pytest.raises(ValidationError, match=r"search\.browser"):
+        SourceRule.model_validate(base)
+
+
+def test_source_rule_accepts_qishuxia_style_browser_search() -> None:
+    base = _minimal_rule()
+    fetcher = base["fetcher"]
+    assert isinstance(fetcher, dict)
+    fetcher = dict(fetcher)
+    fetcher["type"] = "browser"
+    base["fetcher"] = fetcher
+    base["search"] = _browser_search_block()
+
+    rule = SourceRule.model_validate(base)
+
+    assert rule.search is not None
+    assert rule.search.browser is not None
+    assert rule.search.browser.input_selector == "input[name='searchkey']"
+
+
 def test_source_rule_rejects_archive_selector_without_browser_fetcher() -> None:
     base = _minimal_rule()
     base["download_archive"] = {"trigger": "selector", "selector": "a.download"}
@@ -218,5 +304,24 @@ def _minimal_rule() -> dict[str, object]:
         "chapter": {
             "title": {"selector": "h1"},
             "content": {"selector": "#content", "attr": "html"},
+        },
+    }
+
+
+def _browser_search_block() -> dict[str, object]:
+    return {
+        "url_template": "https://www.qishuxia.com/",
+        "browser": {
+            "navigate_url": "https://www.qishuxia.com/",
+            "input_selector": "input[name='searchkey']",
+            "submit_selector": ".btn-tosearch",
+            "wait_for_url": "**/modules/article/search.php**",
+        },
+        "results_container": ".search-list",
+        "items": "li",
+        "fields": {
+            "title": {"selector": "a.book-name"},
+            "author": {"selector": ".author"},
+            "url": {"selector": "a.book-name", "attr": "href", "resolve": "relative"},
         },
     }

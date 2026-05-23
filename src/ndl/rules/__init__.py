@@ -14,6 +14,7 @@ from ndl.rules.resolver import RuleResolver
 from ndl.rules.schema import (
     ArchiveDownloadRule,
     BrowserRule,
+    BrowserSearchRule,
     BrowserViewportRule,
     ChapterListRule,
     ChapterRule,
@@ -35,6 +36,7 @@ from ndl.rules.selector import clean_html_content, extract_selector
 __all__ = [
     "ArchiveDownloadRule",
     "BrowserRule",
+    "BrowserSearchRule",
     "BrowserViewportRule",
     "ChapterListRule",
     "ChapterRule",

@@ -17,7 +17,7 @@ from ndl.core.errors import BrowserError, HTTPError, NDLError, RateLimitedError
 from ndl.fetchers._common import backoff_delay, resolve_headers
 from ndl.fetchers._robots import RobotsChecker
 from ndl.fetchers._throttle import HostThrottle
-from ndl.rules.schema import SourceRule
+from ndl.rules.schema import BrowserSearchRule, SourceRule
 
 
 class BrowserSession(Protocol):
@@ -28,6 +28,11 @@ class BrowserSession(Protocol):
 
     async def download_bytes(self, url: str, selector: str) -> tuple[int | None, bytes]:
         """Navigate to `url`, click `selector`, and return downloaded bytes."""
+
+    async def search_html(
+        self, search: BrowserSearchRule, keyword: str
+    ) -> tuple[int | None, str, str]:
+        """Submit a browser-backed search form and return status, HTML, and final URL."""
 
     async def aclose(self) -> None:
         """Release browser resources."""
@@ -109,6 +114,17 @@ class BrowserFetcher:
         async with self._throttle_for(url).slot():
             return await self._download_with_retry(url, selector)
 
+    async def get_search_html(
+        self,
+        search: BrowserSearchRule,
+        keyword: str,
+    ) -> tuple[str, str]:
+        """Submit a browser-backed search form and return rendered HTML plus base URL."""
+        if self._robots is not None:
+            await self._robots.check(search.navigate_url)
+        async with self._throttle_for(search.navigate_url).slot():
+            return await self._search_with_retry(search, keyword)
+
     async def _ensure_session(self) -> BrowserSession:
         if self._session is None:
             self._session = await self._session_factory(self._rule, self._headers, self._timeout)
@@ -173,6 +189,37 @@ class BrowserFetcher:
                     raise HTTPError(url, status_code)
                 else:
                     return content
+            if attempt + 1 < retry.attempts:
+                await asyncio.sleep(backoff_delay(retry, attempt))
+        assert last_exc is not None
+        raise last_exc
+
+    async def _search_with_retry(
+        self,
+        search: BrowserSearchRule,
+        keyword: str,
+    ) -> tuple[str, str]:
+        retry = self._rule.fetcher.retry
+        last_exc: NDLError | None = None
+        for attempt in range(retry.attempts):
+            try:
+                status_code, html, final_url = await (await self._ensure_session()).search_html(
+                    search, keyword
+                )
+            except BrowserError as exc:
+                last_exc = exc
+            else:
+                if status_code == 429:
+                    last_exc = RateLimitedError(
+                        "Upstream rate-limited the request (HTTP 429).",
+                        detail=f"URL: {search.navigate_url}",
+                    )
+                elif status_code is not None and status_code >= 500:
+                    last_exc = HTTPError(search.navigate_url, status_code)
+                elif status_code is not None and status_code >= 400:
+                    raise HTTPError(search.navigate_url, status_code)
+                else:
+                    return html, final_url
             if attempt + 1 < retry.attempts:
                 await asyncio.sleep(backoff_delay(retry, attempt))
         assert last_exc is not None
@@ -300,6 +347,44 @@ class _PlaywrightBrowserSession:
             raise BrowserError(
                 "Browser download failed.",
                 detail=f"URL: {url}\nSelector: {selector}\n{exc}",
+            ) from exc
+        finally:
+            await page.close()
+
+    async def search_html(
+        self,
+        search: BrowserSearchRule,
+        keyword: str,
+    ) -> tuple[int | None, str, str]:
+        page = await self._context.new_page()
+        try:
+            response = await page.goto(
+                search.navigate_url,
+                wait_until=self._wait_until,
+                timeout=self._timeout_ms,
+            )
+            await page.fill(search.input_selector, keyword, timeout=self._timeout_ms)
+            await page.locator(search.submit_selector).click(timeout=self._timeout_ms)
+            if search.wait_for_url is not None:
+                await page.wait_for_url(search.wait_for_url, timeout=self._timeout_ms)
+            if search.wait_for_selector is not None:
+                await page.wait_for_selector(
+                    search.wait_for_selector,
+                    timeout=self._timeout_ms,
+                )
+            if self._extra_wait_ms:
+                await page.wait_for_timeout(self._extra_wait_ms)
+            status_code = None if response is None else response.status
+            html = await page.content()
+            return status_code, html, page.url
+        except self._error_types as exc:
+            raise BrowserError(
+                "Browser search failed.",
+                detail=(
+                    f"URL: {search.navigate_url}\n"
+                    f"Input selector: {search.input_selector}\n"
+                    f"Submit selector: {search.submit_selector}\n{exc}"
+                ),
             ) from exc
         finally:
             await page.close()
