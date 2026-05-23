@@ -21,7 +21,7 @@ rules, local Web UI, and auditable packaging checks. See
 
 - Validate YAML source rules with `ndl rules validate`
 - Download a rule-matched static HTML site to TXT or EPUB after installing a YAML rule
-- Convert local TXT files to TXT or EPUB
+- Convert local TXT files to TXT or styled EPUB
 - Manage the local SQLite library with `ndl library list/show/remove`
 - Refresh saved ongoing novels with `ndl update --all`
 - Search rule-defined source indexes with `ndl search`

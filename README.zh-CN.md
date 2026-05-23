@@ -19,7 +19,7 @@ v0.1.0 已发布到 PyPI，发行名为 `ndl-storykit`。当前源码已经回�
 
 - 使用 `ndl rules validate` 校验 YAML 站点规则
 - 安装 YAML 规则后，将匹配规则的静态 HTML 站点下载为 TXT 或 EPUB
-- 将本地 TXT 转换为 TXT 或 EPUB
+- 将本地 TXT 转换为 TXT 或带样式的 EPUB
 - 通过 `ndl library list/show/remove` 管理本地 SQLite 书库
 - 通过 `ndl update --all` 刷新已保存的连载小说
 - 通过 `ndl search` 搜索规则文件声明的来源索引
