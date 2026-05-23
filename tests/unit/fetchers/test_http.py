@@ -113,6 +113,25 @@ async def test_get_bytes_returns_raw_response_body(rule: SourceRule) -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_post_sends_form_data_and_returns_decoded_text(rule: SourceRule) -> None:
+    route = respx.post("https://site.test/search.html").mock(
+        return_value=httpx.Response(200, text="<html>results</html>")
+    )
+
+    async with HttpFetcher(rule) as fetcher:
+        body = await fetcher.post(
+            "https://site.test/search.html",
+            data={"s": "red chamber"},
+        )
+
+    assert body == "<html>results</html>"
+    request = route.calls.last.request
+    assert request.headers["user-agent"] == "ndl-test/1.0"
+    assert request.content == b"s=red+chamber"
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_get_retries_on_5xx_then_succeeds(rule: SourceRule) -> None:
     route = respx.get("https://site.test/page").mock(
         side_effect=[

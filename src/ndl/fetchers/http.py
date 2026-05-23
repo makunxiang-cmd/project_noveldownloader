@@ -62,16 +62,36 @@ class HttpFetcher:
         response = await self._get_response(url)
         return self._decode(response, encoding)
 
+    async def post(
+        self,
+        url: str,
+        *,
+        data: dict[str, str],
+        encoding: str | None = None,
+    ) -> str:
+        """POST form data to `url` honoring the rule's policies and return decoded text."""
+        response = await self._request_response(url, method="POST", data=data)
+        return self._decode(response, encoding)
+
     async def get_bytes(self, url: str) -> bytes:
         """Fetch `url` honoring the rule's policies and return raw bytes."""
         response = await self._get_response(url)
         return response.content
 
     async def _get_response(self, url: str) -> httpx.Response:
+        return await self._request_response(url, method="GET", data=None)
+
+    async def _request_response(
+        self,
+        url: str,
+        *,
+        method: str,
+        data: dict[str, str] | None,
+    ) -> httpx.Response:
         if self._robots is not None:
             await self._robots.check(url)
         async with self._throttle_for(url).slot():
-            return await self._fetch_with_retry(url)
+            return await self._fetch_with_retry(url, method=method, data=data)
 
     def _throttle_for(self, url: str) -> HostThrottle:
         host = urlparse(url).netloc
@@ -85,14 +105,25 @@ class HttpFetcher:
             self._throttles[host] = throttle
         return throttle
 
-    async def _fetch_with_retry(self, url: str) -> httpx.Response:
+    async def _fetch_with_retry(
+        self,
+        url: str,
+        *,
+        method: str,
+        data: dict[str, str] | None,
+    ) -> httpx.Response:
         retry = self._rule.fetcher.retry
         last_exc: NDLError | None = None
         next_delay: float | None = None
         for attempt in range(retry.attempts):
             next_delay = None
             try:
-                response = await self._client.get(url, headers=self._headers)
+                response = await self._client.request(
+                    method,
+                    url,
+                    headers=self._headers,
+                    data=data,
+                )
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
                 last_exc = NetworkError(
                     "Network error while fetching URL.",

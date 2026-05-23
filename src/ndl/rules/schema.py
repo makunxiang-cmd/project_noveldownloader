@@ -16,6 +16,7 @@ BrowserWaitUntil = Literal["commit", "domcontentloaded", "load", "networkidle"]
 PaginationType = Literal["none", "next", "index-template"]
 ArchiveFormat = Literal["txt"]
 ArchiveTriggerType = Literal["url-template", "selector"]
+SearchMethod = Literal["GET", "POST"]
 SelectorAttr = Literal["text", "html", "href", "src"]
 ResolveMode = Literal["none", "relative"]
 
@@ -263,13 +264,40 @@ class SearchFields(StrictModel):
     url: Selector
 
 
+class BrowserSearchRule(StrictModel):
+    """Browser-backed search form automation."""
+
+    navigate_url: str = Field(min_length=1)
+    input_selector: str = Field(min_length=1)
+    submit_selector: str = Field(min_length=1)
+    wait_for_url: str | None = Field(default=None, min_length=1)
+    wait_for_selector: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _requires_a_wait_condition(self) -> BrowserSearchRule:
+        if not (self.wait_for_url or self.wait_for_selector):
+            raise ValueError("Either wait_for_url or wait_for_selector must be set")
+        return self
+
+
 class SearchRule(StrictModel):
     """Optional search endpoint parsing rule."""
 
+    method: SearchMethod = "GET"
     url_template: str
+    body: dict[str, str] | None = None
     results_container: str
     items: str
     fields: SearchFields
+    browser: BrowserSearchRule | None = None
+
+    @model_validator(mode="after")
+    def _body_matches_method(self) -> SearchRule:
+        if self.method == "GET" and self.body is not None:
+            raise ValueError("search.body is only valid when search.method is 'POST'")
+        if self.method == "POST" and not self.body:
+            raise ValueError("search.body is required when search.method is 'POST'")
+        return self
 
 
 class SourceRule(StrictModel):
@@ -303,6 +331,12 @@ class SourceRule(StrictModel):
                 raise ValueError(
                     "download_archive selector trigger requires fetcher.type='browser'"
                 )
+        if (
+            self.search is not None
+            and self.search.browser is not None
+            and self.fetcher.type != "browser"
+        ):
+            raise ValueError("search.browser requires fetcher.type='browser'")
         return self
 
     def matches(self, url: str) -> bool:

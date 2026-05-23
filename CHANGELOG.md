@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   archives fetch raw bytes through HTTP, browser selector archives capture a
   Playwright download, and `DownloadService` decodes, strips, and splits the TXT
   against index chapter titles.
+- Search rules can now declare `method: POST` with form `body` values, browser
+  form automation through `search.browser`, and built-in result de-duplication
+  by `(source_rule_id, url)`.
 
 ### Fixed
 
