@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `0.2.0.dev0` development cycle instead of the earlier P7 release-candidate
   state.
 
+### Added
+
+- Rule pagination is now consumed by `DownloadService`: index pages can follow
+  `pagination.type: next` links or `pagination.type: index-template` URL
+  templates with URL de-duplication and cycle guards, and chapter pages can
+  follow same-chapter `next` links to merge split chapter bodies.
+
 ### Fixed
 
 - Browser-backed fetches now stop the started Playwright runtime instead of

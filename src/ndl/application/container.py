@@ -90,6 +90,7 @@ class ServiceContainer:
             service = DownloadService(
                 fetcher=fetcher,
                 parser=self.parser_for(rule),
+                rule=rule,
                 progress=progress,
             )
             return await service.download(url)

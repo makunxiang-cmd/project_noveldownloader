@@ -20,6 +20,11 @@ class HtmlParser:
     def __init__(self, rule: SourceRule) -> None:
         self._rule = rule
 
+    @property
+    def rule(self) -> SourceRule:
+        """Return the SourceRule bound to this parser."""
+        return self._rule
+
     def parse_index(self, html: str, *, source_url: str) -> tuple[Novel, list[ChapterStub]]:
         return parse_index(self._rule, html, source_url=source_url)
 
