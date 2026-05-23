@@ -31,5 +31,5 @@
 - [ ] `rate_limit.min_interval_ms >= 500`
 - [ ] `max_concurrency <= 3`
 - [ ] User-Agent includes NDL identifier
-- [ ] If `ignore_robots: true`, `ignore_justification` is provided
+- [ ] If `robots.respect: false`, `robots.ignore_justification` is provided
 - [ ] Target site is not commercial/paywalled
