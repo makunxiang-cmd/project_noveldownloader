@@ -10,6 +10,7 @@ from ndl.rules.schema import (
     ArchiveDownloadRule,
     BrowserRule,
     BrowserSearchRule,
+    ChapterListRule,
     FetcherRule,
     PaginationRule,
     RateLimitRule,
@@ -100,6 +101,20 @@ def test_pagination_rule_rejects_mismatched_fields() -> None:
         PaginationRule(type="index-template")
     with pytest.raises(ValidationError, match=r"pagination\.template"):
         PaginationRule(type="next", next=next_selector, template="index_{page}.html")
+
+
+def test_chapter_list_rule_accepts_container_pick_modes() -> None:
+    title = Selector(selector="a")
+    url = Selector(selector="a", attr="href")
+
+    assert ChapterListRule(container="ul", items="li", title=title, url=url).pick == "first"
+    assert (
+        ChapterListRule(container="ul", pick="largest", items="li", title=title, url=url).pick
+        == "largest"
+    )
+
+    with pytest.raises(ValidationError):
+        ChapterListRule(container="ul", pick="middle", items="li", title=title, url=url)
 
 
 def test_archive_download_rule_validates_trigger_modes() -> None:

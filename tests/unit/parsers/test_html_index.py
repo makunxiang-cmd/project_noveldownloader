@@ -120,3 +120,50 @@ def test_parse_index_status_unknown_when_selector_missing_from_rule(tmp_path) ->
     novel, _ = parse_index(rule, INDEX_HTML, source_url="https://t.test/book/1")
 
     assert novel.status == "unknown"
+
+
+RULE_YAML_PICK_LARGEST = """
+id: index_test
+name: Index Test
+version: 1.0.0
+author: Tests
+url_patterns:
+  - pattern: "https://t.test/*"
+    type: glob
+index:
+  novel:
+    title: { selector: "h1.book-title" }
+    author: { selector: ".author" }
+  chapter_list:
+    container: "ul.section-list"
+    pick: largest
+    items: "li > a"
+    title: { selector: "self" }
+    url: { selector: "self", attr: "href", resolve: "relative" }
+chapter:
+  title: { selector: "h1" }
+  content: { selector: "#content", attr: "html" }
+"""
+
+
+def test_parse_index_can_pick_largest_matching_chapter_container(tmp_path) -> None:
+    rule = _rule(tmp_path, body=RULE_YAML_PICK_LARGEST)
+    html = """
+    <!doctype html>
+    <html><body>
+      <h1 class="book-title">测试小说</h1>
+      <span class="author">某作者</span>
+      <ul class="section-list">
+        <li><a href="/book/1/latest">最新章节</a></li>
+      </ul>
+      <ul class="section-list">
+        <li><a href="/book/1/c/1">第一章</a></li>
+        <li><a href="/book/1/c/2">第二章</a></li>
+        <li><a href="/book/1/c/3">第三章</a></li>
+      </ul>
+    </body></html>
+    """
+
+    _, stubs = parse_index(rule, html, source_url="https://t.test/book/1")
+
+    assert [stub.title for stub in stubs] == ["第一章", "第二章", "第三章"]

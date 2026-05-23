@@ -14,6 +14,7 @@ BackoffType = Literal["fixed", "exponential"]
 EncodingName = Literal["utf-8", "gbk", "gb18030", "auto"]
 BrowserWaitUntil = Literal["commit", "domcontentloaded", "load", "networkidle"]
 PaginationType = Literal["none", "next", "index-template"]
+ContainerPick = Literal["first", "last", "largest"]
 ArchiveFormat = Literal["txt"]
 ArchiveTriggerType = Literal["url-template", "selector"]
 SearchMethod = Literal["GET", "POST"]
@@ -169,6 +170,7 @@ class ChapterListRule(StrictModel):
     """Index page chapter list selectors."""
 
     container: str = Field(min_length=1)
+    pick: ContainerPick = "first"
     items: str = Field(min_length=1)
     title: Selector
     url: Selector
