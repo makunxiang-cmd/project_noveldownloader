@@ -33,7 +33,7 @@ assignees: ""
 
 ## Full Traceback
 
-Run the failing command with `--log-level debug` and paste here:
+Paste the full command output and traceback here:
 
 ```text
 (paste traceback)

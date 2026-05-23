@@ -39,7 +39,7 @@ Use the bug report template. Include:
 - NDL version (`ndl --version`)
 - OS and Python version
 - Minimal URL, YAML, or command to reproduce
-- Full traceback with `--log-level debug`
+- Full command output and traceback
 
 ### 3. Feature Requests
 

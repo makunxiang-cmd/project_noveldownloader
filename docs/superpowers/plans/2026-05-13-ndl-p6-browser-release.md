@@ -9,7 +9,7 @@
 Support rule-selected browser rendering for JavaScript-heavy public-domain pages while preparing the project for a v0.1 release:
 
 ```bash
-pip install ndl[browser]
+pip install 'ndl-storykit[browser]'
 ndl download "https://example.test/js-index" -o book.epub
 ```
 

@@ -2,7 +2,10 @@
 
 ## Supported Versions
 
-NDL has not been published to PyPI yet. Until the first public release, security fixes apply to the active repository state on `main`. After publication, only the latest minor release on PyPI receives security fixes; older pre-release versions (0.x) may not be maintained once a newer 0.y is published.
+NDL v0.1.0 has been published to PyPI as `ndl-storykit`. Security fixes apply
+to the latest public minor release on PyPI and to the active development state
+on `main`. Older pre-release or 0.x minor versions may not be maintained once a
+newer 0.y release is published.
 
 ## Reporting a Vulnerability
 
@@ -10,8 +13,10 @@ Please do not open a public issue for security vulnerabilities.
 
 Report privately by:
 
-1. Opening a [GitHub Security Advisory draft](https://github.com/makunxiang-cmd/project_noveldownloader/security/advisories/new) (preferred)
-2. Emailing the maintainer: (TODO: add contact email before v0.1 release)
+1. Opening a [GitHub Security Advisory draft](https://github.com/makunxiang-cmd/project_noveldownloader/security/advisories/new)
+
+No maintainer security email is currently published. Use the GitHub Security
+Advisory channel for private vulnerability reports.
 
 Include:
 
