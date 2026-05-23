@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## 0.2 release — downstream requirements (added 2026-05-23)
+
+Before planning any 0.2 work, read **`docs/agents/downstream-feedback/2026-05-23-ndl-desktop.md`**. It is a 1,100-line, item-by-item improvement-requirements document authored by the downstream consumer `ndl-desktop`, derived from every workaround that downstream had to ship because this repo couldn't do something. It is organised into 9 parallel-safe tracks (A–I) with severity / effort tags, current behaviour (with file:line citations into this repo), proposed fixes with code sketches, acceptance criteria, and dependencies between items. Landing tracks A–E unblocks deleting ~1,200 lines of downstream adapter code.
+
+Pick a track, follow it as the spec.
+
 ## Current handoff
 
 Before changing code, read `docs/superpowers/SESSION-STATE.md` first. P0
