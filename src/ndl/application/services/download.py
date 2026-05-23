@@ -83,18 +83,9 @@ class DownloadService:
             else "Fetching chapters.",
         )
         if rule is not None and rule.download_archive is not None:
-            chapters = await self._fetch_archive_chapters(url, stubs, rule.download_archive)
-            for done, chapter in enumerate(chapters, start=1):
-                await emit_progress(
-                    self._progress,
-                    kind="chapter",
-                    stage="fetching_chapters",
-                    total=len(stubs),
-                    done=done,
-                    current_title=chapter.title,
-                )
+            chapters = await self.fetch_chapters(stubs, source_url=url)
         else:
-            chapters = await self._fetch_chapters(stubs)
+            chapters = await self.fetch_chapters(stubs)
 
         completed = novel.model_copy(
             update={"chapters": sorted(chapters, key=lambda item: item.index)}
@@ -108,6 +99,43 @@ class DownloadService:
             message="Download complete.",
         )
         return completed
+
+    async def fetch_index_only(self, url: str) -> tuple[Novel, list[ChapterStub]]:
+        """Fetch and parse the index, applying any rule-defined index pagination."""
+        index_html = await self._fetcher.get(url)
+        rule = self._rule
+        if rule is not None and rule.download_archive is not None:
+            return self._parser.parse_index(index_html, source_url=url)
+        return await self._parse_index_pages(url, index_html)
+
+    async def fetch_chapters(
+        self,
+        stubs: list[ChapterStub],
+        *,
+        source_url: str | None = None,
+    ) -> list[Chapter]:
+        """Fetch chapters for `stubs`, using the active rule's chapter/archive strategy."""
+        if not stubs:
+            return []
+        rule = self._rule
+        if rule is not None and rule.download_archive is not None:
+            if source_url is None:
+                raise FetchError(
+                    "Archive downloads require the source index URL.",
+                    detail=f"Rule: {rule.id}",
+                )
+            chapters = await self._fetch_archive_chapters(source_url, stubs, rule.download_archive)
+            for done, chapter in enumerate(chapters, start=1):
+                await emit_progress(
+                    self._progress,
+                    kind="chapter",
+                    stage="fetching_chapters",
+                    total=len(stubs),
+                    done=done,
+                    current_title=chapter.title,
+                )
+            return chapters
+        return await self._fetch_chapters(stubs)
 
     async def _parse_index_pages(
         self, url: str, first_html: str
